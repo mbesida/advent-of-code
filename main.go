@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	res, err := day01.Solve1()
+	res, err := day01.Solve2()
 
 	if err != nil {
 		log.Fatal(err)
