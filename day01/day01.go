@@ -1,21 +1,38 @@
-package day01
+package main
 
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
-	"strconv"
 	"unicode"
 
 	"github.com/s0rg/trie"
 )
 
-func Solve1() (int, error) {
-	return commonLogic(digits1)
-}
+func main() {
+	var choice string
 
-func Solve2() (int, error) {
-	return commonLogic(digits2)
+	if len(os.Args) >= 2 {
+		choice = os.Args[1]
+	}
+
+	var result int
+	var err error
+
+	if choice == "2" {
+		fmt.Println("solving 2nd task of day 1")
+		result, err = commonLogic(digits2)
+	} else {
+		fmt.Println("solving 1st task of day 1")
+		result, err = commonLogic(digits1)
+	}
+
+	if err != nil {
+		log.Fatalf("somewthing bad happened: %v\n", err)
+	}
+
+	fmt.Println(result)
 }
 
 func commonLogic(handleDigits func(string) [2]int) (int, error) {
@@ -107,20 +124,16 @@ func digits2(s string) [2]int {
 func calibrationValue(s string, handleDigits func(string) [2]int) (int, error) {
 	digits := handleDigits(s)
 
-	var resultString string = "0"
+	var result int
 	var err error
 
 	if digits == [2]int{0, 0} {
 		err = fmt.Errorf("no digit found on line %s", s)
 	} else if digits[1] == 0 {
-		resultString = fmt.Sprintf("%[1]d%[1]d", digits[0])
+		result = digits[0]*10 + digits[0]
 	} else {
-		resultString = fmt.Sprintf("%d%d", digits[0], digits[1])
+		result = digits[0]*10 + digits[1]
 	}
 
-	if err != nil {
-		return 0, err
-	} else {
-		return strconv.Atoi(resultString)
-	}
+	return result, err
 }
