@@ -10,18 +10,31 @@ import (
 	"strings"
 )
 
-type GameData struct {
-	GameId  int
-	IsValid bool
-}
-
 const (
 	REDS   = 12
 	GREENS = 13
 	BlUES  = 14
 )
 
+type GameData struct {
+	GameId    int
+	IsValid   bool
+	MaxReds   int
+	MaxGreens int
+	MaxBlues  int
+}
+
+func NewGameData(id int, isValid bool) *GameData {
+	return &GameData{id, isValid, 0, 0, 0}
+}
+
 func main() {
+	var choice string
+
+	if len(os.Args) >= 2 {
+		choice = os.Args[1]
+	}
+
 	file, err := os.Open("day02/input")
 	if err != nil {
 		log.Fatalf("no input file available")
@@ -36,12 +49,28 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		if data.IsValid {
-			sum += data.GameId
+		if choice == "2" {
+			sum += task2(data)
+		} else {
+			sum += task1(data)
 		}
 	}
 
 	fmt.Println(sum)
+}
+
+func task1(data *GameData) int {
+	result := 0
+
+	if data.IsValid {
+		result += data.GameId
+	}
+
+	return result
+}
+
+func task2(data *GameData) int {
+	return data.MaxBlues * data.MaxGreens * data.MaxReds
 }
 
 func parseRow(row string) (*GameData, error) {
@@ -60,6 +89,8 @@ func parseRow(row string) (*GameData, error) {
 	attemptsStr := gameSplitted[1]
 	attempts := strings.Split(attemptsStr, ";")
 
+	gameData := NewGameData(gameId, true)
+
 	for _, attempt := range attempts {
 		parts := strings.Split(attempt, ",")
 
@@ -72,26 +103,25 @@ func parseRow(row string) (*GameData, error) {
 			if err != nil {
 				return nil, invalidRawFormat(row)
 			}
-			var limit int
 
 			switch rawData[1] {
 			case "red":
-				limit = REDS
+				gameData.MaxReds = max(gameData.MaxReds, value)
 			case "green":
-				limit = GREENS
+				gameData.MaxGreens = max(gameData.MaxGreens, value)
 			case "blue":
-				limit = BlUES
+				gameData.MaxBlues = max(gameData.MaxBlues, value)
 			default:
 				return nil, invalidRawFormat(row)
-			}
-
-			if value > limit {
-				return &GameData{gameId, false}, nil
 			}
 		}
 	}
 
-	return &GameData{gameId, true}, nil
+	if gameData.MaxBlues > BlUES || gameData.MaxGreens > GREENS || gameData.MaxReds > REDS {
+		gameData.IsValid = false
+	}
+
+	return gameData, nil
 
 }
 
