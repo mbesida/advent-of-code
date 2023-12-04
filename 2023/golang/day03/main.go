@@ -40,12 +40,6 @@ func buildMatrix(scanner *bufio.Scanner) [][]rune {
 	return matrix
 }
 
-func printMatrix(m Matrix) {
-	for _, r := range m {
-		fmt.Println(string(r))
-	}
-}
-
 func partNumbersSum(matrix Matrix) int {
 	var sum int
 	visitedIndices := make(map[[2]int]struct{})
