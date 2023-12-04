@@ -7,26 +7,20 @@ import (
 	"os"
 	"unicode"
 
+	"github.com/mbesida/advent-of-code-2023/common"
 	"github.com/s0rg/trie"
 )
 
 func main() {
-	var choice string
-
-	if len(os.Args) >= 2 {
-		choice = os.Args[1]
+	task1Func := func() (int, error) {
+		return handleFile(digits1)
 	}
 
-	var result int
-	var err error
-
-	if choice == "2" {
-		fmt.Println("solving 2nd task of day 1")
-		result, err = commonLogic(digits2)
-	} else {
-		fmt.Println("solving 1st task of day 1")
-		result, err = commonLogic(digits1)
+	task2Func := func() (int, error) {
+		return handleFile(digits2)
 	}
+
+	result, err := common.HandleTasks(task1Func, task2Func)
 
 	if err != nil {
 		log.Fatalf("somewthing bad happened: %v\n", err)
@@ -35,7 +29,7 @@ func main() {
 	fmt.Println(result)
 }
 
-func commonLogic(handleDigits func(string) [2]int) (int, error) {
+func handleFile(handleDigits func(string) [2]int) (int, error) {
 	file, err := os.Open("day01/input1")
 	if err != nil {
 		return 0, err

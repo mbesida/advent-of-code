@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mbesida/advent-of-code-2023/common"
 )
 
 const (
@@ -29,12 +31,6 @@ func NewGameData(id int, isValid bool) *GameData {
 }
 
 func main() {
-	var choice string
-
-	if len(os.Args) >= 2 {
-		choice = os.Args[1]
-	}
-
 	file, err := os.Open("day02/input")
 	if err != nil {
 		log.Fatalf("no input file available")
@@ -49,11 +45,16 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		if choice == "2" {
-			sum += task2(data)
-		} else {
-			sum += task1(data)
-		}
+
+		t1 := common.ToTask(func() int {
+			return task1(data)
+		})
+		t2 := common.ToTask(func() int {
+			return task2(data)
+		})
+
+		value, _ := common.HandleTasks(t1, t2)
+		sum += value
 	}
 
 	fmt.Println(sum)
