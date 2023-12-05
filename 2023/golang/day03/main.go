@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"unicode"
+
+	"github.com/mbesida/advent-of-code-2023/common"
 )
 
 type VisitedMap = map[[2]int]struct{}
@@ -27,7 +29,14 @@ func main() {
 }
 
 func isSymbol(s rune) bool {
-	return (unicode.IsPunct(s) || unicode.IsSymbol(s)) && s != '.'
+	task1 := func() bool {
+		return (unicode.IsPunct(s) || unicode.IsSymbol(s)) && s != '.'
+	}
+
+	task2 := func() bool {
+		return s == '*'
+	}
+	return common.HandleTasks(task1, task2)
 }
 
 func buildMatrix(scanner *bufio.Scanner) [][]rune {
@@ -44,50 +53,68 @@ func partNumbersSum(matrix Matrix) int {
 	var sum int
 	visitedIndices := make(map[[2]int]struct{})
 
-	find := func(i, j int) int {
-		return findNumber(i, j, matrix, visitedIndices)
+	find := func(i, j int, adjacentNumbers []int) []int {
+		return findNumber(i, j, matrix, visitedIndices, adjacentNumbers)
 	}
 
 	for i, row := range matrix {
 		for j, s := range row {
 			if isSymbol(s) {
+				var adjacentNumbers []int
 				if i > 0 {
-					sum += find(i-1, j)
+					adjacentNumbers = find(i-1, j, adjacentNumbers)
 				}
 				if j > 0 {
-					sum += find(i, j-1)
+					adjacentNumbers = find(i, j-1, adjacentNumbers)
 				}
 				if i < len(matrix)-1 {
-					sum += find(i+1, j)
+					adjacentNumbers = find(i+1, j, adjacentNumbers)
 				}
 				if j < len(row)-1 {
-					sum += find(i, j+1)
+					adjacentNumbers = find(i, j+1, adjacentNumbers)
 				}
 				if i > 0 && j > 0 {
-					sum += find(i-1, j-1)
+					adjacentNumbers = find(i-1, j-1, adjacentNumbers)
 				}
 				if i < len(matrix)-1 && j < len(row)-1 {
-					sum += find(i+1, j+1)
+					adjacentNumbers = find(i+1, j+1, adjacentNumbers)
 				}
 				if i > 0 && j < len(row)-1 {
-					sum += find(i-1, j+1)
+					adjacentNumbers = find(i-1, j+1, adjacentNumbers)
 				}
 				if i < len(matrix)-1 && j > 0 {
-					sum += find(i+1, j-1)
+					adjacentNumbers = find(i+1, j-1, adjacentNumbers)
 				}
+
+				t1 := func() int {
+					total := 0
+					for _, v := range adjacentNumbers {
+						total += v
+					}
+					return total
+				}
+
+				t2 := func() int {
+					total := 0
+					if len(adjacentNumbers) == 2 {
+						total = adjacentNumbers[0] * adjacentNumbers[1]
+					}
+					return total
+				}
+				sum += common.HandleTasks(t1, t2)
 			}
 		}
 	}
 	return sum
 }
 
-func findNumber(i, j int, matrix Matrix, visited VisitedMap) int {
-	var result int
+func findNumber(i, j int, matrix Matrix, visited VisitedMap, adjacentNumbers []int) []int {
 	_, ok := visited[[2]int{i, j}]
 	if unicode.IsDigit(matrix[i][j]) && !ok {
-		result = parseNumber(i, j, matrix, visited)
+		result := parseNumber(i, j, matrix, visited)
+		adjacentNumbers = append(adjacentNumbers, result)
 	}
-	return result
+	return adjacentNumbers
 }
 
 func parseNumber(i, j int, matrix Matrix, visited VisitedMap) int {
