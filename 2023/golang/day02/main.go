@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,10 +30,7 @@ func NewGameData(id int, isValid bool) *GameData {
 }
 
 func main() {
-	file, err := os.Open("day02/input")
-	if err != nil {
-		log.Fatalf("no input file available")
-	}
+	file := common.InputFileHandle("day02")
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 

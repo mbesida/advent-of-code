@@ -3,8 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
-	"os"
 	"strconv"
 	"unicode"
 
@@ -15,13 +13,10 @@ type VisitedMap = map[[2]int]struct{}
 type Matrix = [][]rune
 
 func main() {
-	file, err := os.Open("day03/input")
-	if err != nil {
-		log.Fatal("can't open input data file")
-	}
-	defer file.Close()
+	f := common.InputFileHandle("day03")
+	defer f.Close()
 
-	matrix := buildMatrix(bufio.NewScanner(file))
+	matrix := buildMatrix(bufio.NewScanner(f))
 
 	result := partNumbersSum(matrix)
 	fmt.Println(result)

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"log"
-	"os"
 	"unicode"
 
 	"github.com/mbesida/advent-of-code-2023/common"
@@ -30,13 +29,10 @@ func main() {
 }
 
 func handleFile(handleDigits func(string) [2]int) (int, error) {
-	file, err := os.Open("day01/input")
-	if err != nil {
-		return 0, err
-	}
-	defer file.Close()
+	f := common.InputFileHandle("day01")
+	defer f.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(f)
 	sum := 0
 	for scanner.Scan() {
 		number, err := calibrationValue(scanner.Text(), handleDigits)

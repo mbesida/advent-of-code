@@ -1,6 +1,8 @@
 package common
 
 import (
+	"fmt"
+	"log"
 	"os"
 )
 
@@ -22,6 +24,15 @@ func HandleTasks[T any](task1Func func() T, task2Func func() T) T {
 	} else {
 		return task1Func()
 	}
+}
+
+func InputFileHandle(day string) *os.File {
+	inputFile := fmt.Sprintf("%s/input", day)
+	file, err := os.Open(inputFile)
+	if err != nil {
+		log.Fatal("can't open input file")
+	}
+	return file
 }
 
 func getChoice() string {
