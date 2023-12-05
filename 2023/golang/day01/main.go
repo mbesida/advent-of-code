@@ -20,7 +20,7 @@ func main() {
 		return handleFile(digits2)
 	}
 
-	result, err := common.HandleTasks(task1Func, task2Func)
+	result, err := common.HandleTasksWithErrors(task1Func, task2Func)
 
 	if err != nil {
 		log.Fatalf("somewthing bad happened: %v\n", err)

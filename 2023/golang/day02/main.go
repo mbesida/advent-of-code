@@ -46,15 +46,14 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		t1 := common.ToTask(func() int {
+		t1 := func() int {
 			return task1(data)
-		})
-		t2 := common.ToTask(func() int {
+		}
+		t2 := func() int {
 			return task2(data)
-		})
+		}
 
-		value, _ := common.HandleTasks(t1, t2)
-		sum += value
+		sum += common.HandleTasks(t1, t2)
 	}
 
 	fmt.Println(sum)
