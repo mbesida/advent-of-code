@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -22,12 +23,48 @@ func main() {
 	f := common.InputFileHandle("day04")
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
-	sum := 0
+	cards := make(map[int][]Card)
+
 	for scanner.Scan() {
 		card, _ := parseCard(scanner.Text())
-		sum += card.Points
+		cards[card.Id] = append(cards[card.Id], *card)
 	}
-	fmt.Println(sum)
+
+	totcalCards := len(cards)
+
+	t1 := func() int {
+		sum := 0
+		for _, cardSlice := range cards {
+			sum += cardSlice[0].Points
+		}
+		return sum
+	}
+
+	t2 := func() int {
+		keys := make([]int, 0, len(cards))
+		for k := range cards {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+		for _, id := range keys {
+			for _, card := range cards[id] {
+				points := card.Points
+				for i := id + 1; i <= id+points; i++ {
+					if i <= totcalCards {
+						c := cards[i]
+						cards[i] = append(cards[i], c[0])
+					}
+				}
+
+			}
+		}
+		value := 0
+		for _, cardSlice := range cards {
+			value += len(cardSlice)
+		}
+		return value
+	}
+	fmt.Println(common.HandleTasks(t1, t2))
 }
 
 func parseCard(s string) (*Card, error) {
@@ -58,9 +95,17 @@ func parseCard(s string) (*Card, error) {
 			points += 1
 		}
 	}
-	if points != 0 {
-		points = int(math.Pow(2, float64(points-1)))
+	t1 := func() int {
+		if points != 0 {
+			return int(math.Pow(2, float64(points-1)))
+		} else {
+			return points
+		}
+
+	}
+	t2 := func() int {
+		return points
 	}
 
-	return &Card{cardId, points}, nil
+	return &Card{cardId, common.HandleTasks(t1, t2)}, nil
 }
