@@ -30,7 +30,7 @@ func main() {
 }
 
 func handleFile(handleDigits func(string) [2]int) (int, error) {
-	file, err := os.Open("day01/input1")
+	file, err := os.Open("day01/input")
 	if err != nil {
 		return 0, err
 	}
