@@ -2,8 +2,8 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"fmt"
-	"math"
 	"os"
 	"slices"
 	"strconv"
@@ -28,7 +28,7 @@ var LettersOrder = map[rune]int{
 	'A': 13,
 	'K': 12,
 	'Q': 11,
-	'J': 10,
+	'J': common.HandleTasks(func() int { return 10 }, func() int { return 0 }),
 	'T': 9,
 	'9': 8,
 	'8': 7,
@@ -41,8 +41,9 @@ var LettersOrder = map[rune]int{
 }
 
 type Hand struct {
-	label string
-	tpe   HandType
+	label       string
+	tpe         HandType
+	possibleTpe HandType
 }
 
 type Record struct {
@@ -57,26 +58,35 @@ func NewHand(label string) Hand {
 		letters[r]++
 	}
 
-	var tpe HandType
-	switch {
-	case isFiveKind(letters):
-		tpe = FiveKind
-	case isFourKind(letters):
-		tpe = FourKind
-	case isFullHouse(letters):
-		tpe = FullHouse
-	case isThreeKind(letters):
-		tpe = ThreeKind
-	case isTwoPair(letters):
-		tpe = TwoPair
-	case isOnePair(letters):
-		tpe = OnePair
-	default:
-		tpe = HighCard
+	frequencies := sortedFrequencies(letters)
+
+	tpe := handType(frequencies)
+
+	t1 := func() Hand {
+		return Hand{label, tpe, -1}
 	}
 
-	return Hand{label, tpe}
+	t2 := func() Hand {
+		if strings.Contains(label, "J") {
+			jCount := letters['J']
+			topNonJ := 'A'
+			value := 1
+			for k, v := range letters {
+				if k != 'J' && v >= value {
+					topNonJ = k
+					value = v
+				}
+			}
+			delete(letters, 'J')
+			letters[topNonJ] += jCount
+			possibleFrequencies := sortedFrequencies(letters)
+			possibleTpe := handType(possibleFrequencies)
+			return Hand{label, tpe, possibleTpe}
+		}
+		return Hand{label, tpe, tpe}
+	}
 
+	return common.HandleTasks(t1, t2)
 }
 
 func main() {
@@ -96,14 +106,23 @@ func main() {
 }
 
 func compareHands(h1, h2 Record) int {
-	if h1.hand.tpe < h2.hand.tpe {
-		return -1
+	t1 := func() int {
+		return cmp.Compare(h1.hand.tpe, h2.hand.tpe)
 	}
-	if h1.hand.tpe > h2.hand.tpe {
-		return 1
+
+	t2 := func() int {
+		return cmp.Compare(h1.hand.possibleTpe, h2.hand.possibleTpe)
 	}
-	letters1 := strings.Split(h1.hand.label, "")
-	letters2 := strings.Split(h2.hand.label, "")
+
+	cmpRes := common.HandleTasks(t1, t2)
+	if cmpRes != 0 {
+		return cmpRes
+	}
+
+	labelFunc := func(h Hand) func() string { return func() string { return h.label } }
+
+	letters1 := strings.Split(labelFunc(h1.hand)(), "")
+	letters2 := strings.Split(labelFunc(h2.hand)(), "")
 	for i := 0; i < len(letters1); i++ {
 		c := compareLetters(rune(letters1[i][0]), rune(letters2[i][0]))
 		if c != 0 {
@@ -114,10 +133,20 @@ func compareHands(h1, h2 Record) int {
 }
 
 func compareLetters(l1, l2 rune) int {
-	if LettersOrder[l1] < LettersOrder[l2] {
+	t1 := func() map[rune]int {
+		return LettersOrder
+	}
+
+	t2 := func() map[rune]int {
+		return LettersOrder
+	}
+
+	mapping := common.HandleTasks(t1, t2)
+
+	if mapping[l1] < mapping[l2] {
 		return -1
 	}
-	if LettersOrder[l1] > LettersOrder[l2] {
+	if mapping[l1] > mapping[l2] {
 		return 1
 	}
 	return 0
@@ -134,50 +163,52 @@ func parseRecords(f *os.File) []Record {
 	return records
 }
 
-func isFiveKind(letters map[rune]int) bool {
-	return len(letters) == 1
+func isFiveKind(sortedFrequencies []int) bool {
+	return len(sortedFrequencies) == 1
 }
-func isFourKind(letters map[rune]int) bool {
-	keys := make([]rune, 0, len(letters))
-	for k := range letters {
-		keys = append(keys, k)
-	}
+func isFourKind(sortedFrequencies []int) bool {
+	return slices.Equal(sortedFrequencies, []int{1, 4})
+}
+func isFullHouse(sortedFrequencies []int) bool {
+	return slices.Equal(sortedFrequencies, []int{2, 3})
+}
+func isThreeKind(sortedFrequencies []int) bool {
+	return slices.Equal(sortedFrequencies, []int{1, 1, 3})
+}
+func isTwoPair(sortedFrequencies []int) bool {
+	return slices.Equal(sortedFrequencies, []int{1, 2, 2})
+}
+func isOnePair(sortedFrequencies []int) bool {
+	return slices.Equal(sortedFrequencies, []int{1, 1, 1, 2})
+}
 
-	return len(letters) == 2 && math.Abs(float64(letters[keys[0]])-float64(letters[keys[1]])) == 3
-}
-func isFullHouse(letters map[rune]int) bool {
-	keys := make([]rune, 0, len(letters))
-	for k := range letters {
-		keys = append(keys, k)
+func handType(sortedFrequencies []int) HandType {
+	var tpe HandType
+
+	switch {
+	case isFiveKind(sortedFrequencies):
+		tpe = FiveKind
+	case isFourKind(sortedFrequencies):
+		tpe = FourKind
+	case isFullHouse(sortedFrequencies):
+		tpe = FullHouse
+	case isThreeKind(sortedFrequencies):
+		tpe = ThreeKind
+	case isTwoPair(sortedFrequencies):
+		tpe = TwoPair
+	case isOnePair(sortedFrequencies):
+		tpe = OnePair
+	default:
+		tpe = HighCard
 	}
-	return len(letters) == 2 && math.Abs(float64(letters[keys[0]])-float64(letters[keys[1]])) == 1
+	return tpe
 }
-func isThreeKind(letters map[rune]int) bool {
-	size := len(letters)
+
+func sortedFrequencies(letters map[rune]int) []int {
+	frequencies := make([]int, 0, len(letters))
 	for _, v := range letters {
-		if v == 3 {
-			return size == 3
-		}
+		frequencies = append(frequencies, v)
 	}
-	return false
-}
-func isTwoPair(letters map[rune]int) bool {
-	values := make([]int, 0, len(letters))
-	for _, v := range letters {
-		values = append(values, v)
-	}
-
-	slices.Sort(values)
-
-	return slices.Equal(values, []int{1, 2, 2})
-}
-func isOnePair(letters map[rune]int) bool {
-	values := make([]int, 0, len(letters))
-	for _, v := range letters {
-		values = append(values, v)
-	}
-
-	slices.Sort(values)
-
-	return slices.Equal(values, []int{1, 1, 1, 2})
+	slices.Sort(frequencies)
+	return frequencies
 }
