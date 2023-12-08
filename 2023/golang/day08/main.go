@@ -29,16 +29,17 @@ func main() {
 	scanner.Scan()
 	network := buildMap(scanner)
 
-	res := travel(network)
+	res := common.HandleTasks(func() int { return travelFirst(network) }, func() int { return travelSecond(network) })
 	fmt.Println(res)
 }
 
-func travel(network Map) int {
+func travelFirst(network Map) int {
 	destination := "ZZZ"
 	current := "AAA"
 	counter := 0
 	n := len(instructions)
 	for {
+
 		if current == destination {
 			break
 		}
@@ -52,6 +53,46 @@ func travel(network Map) int {
 		counter++
 	}
 	return counter
+}
+
+func travelSecond(network Map) int {
+	n := len(instructions)
+	var current []string
+	for k := range network {
+		if strings.HasSuffix(k, "A") {
+			current = append(current, k)
+		}
+	}
+	stepsToEnd := make([]int, len(current))
+
+	counter := 0
+	for {
+		if endCondition(stepsToEnd) {
+			break
+		}
+		for i, v := range current {
+			if stepsToEnd[i] != 0 {
+				continue
+			}
+			directions := network[v]
+			chosenDirection := rune(instructions[counter%n])
+			if chosenDirection == 'L' {
+				current[i] = directions.left
+			} else {
+				current[i] = directions.right
+			}
+			if strings.HasSuffix(current[i], "Z") {
+				stepsToEnd[i] = counter + 1
+			}
+		}
+		counter++
+	}
+
+	res := stepsToEnd[0]
+	for i := 1; i < len(stepsToEnd); i++ {
+		res = lcd(res, stepsToEnd[i])
+	}
+	return res
 }
 
 func buildMap(scanner *bufio.Scanner) Map {
@@ -69,4 +110,26 @@ func buildMap(scanner *bufio.Scanner) Map {
 		result[locationId] = Direction{left, right}
 	}
 	return result
+}
+
+func endCondition(stepsToEnd []int) bool {
+	for _, v := range stepsToEnd {
+		if v == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func gcd(a, b int) int {
+	for b != 0 {
+		t := b
+		b = a % b
+		a = t
+	}
+	return a
+}
+
+func lcd(a, b int) int {
+	return (a * b) / gcd(a, b)
 }
