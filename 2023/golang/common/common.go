@@ -26,6 +26,16 @@ func HandleTasks[T any](task1Func func() T, task2Func func() T) T {
 	}
 }
 
+func HandleValue[T any](value1 T, value2 T) T {
+	choice := getChoice()
+
+	if choice == "2" {
+		return value1
+	} else {
+		return value2
+	}
+}
+
 func InputFileHandle(day string) *os.File {
 	inputFile := fmt.Sprintf("%s/input", day)
 	file, err := os.Open(inputFile)
