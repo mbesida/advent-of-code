@@ -3,12 +3,16 @@ package main
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
 )
 
 type Direction int
+type Point struct {
+	i, j int
+}
 
 const (
 	undefined Direction = iota
@@ -20,10 +24,11 @@ const (
 
 type Map = [][]rune
 type ParsedData struct {
-	x       int
-	y       int
-	network Map
+	startingPoint Point
+	network       Map
 }
+
+type Path []Point
 
 func main() {
 	f := common.InputFileHandle("day10")
@@ -33,7 +38,15 @@ func main() {
 	dataString := string(data)
 
 	parsedData := parseData(dataString)
-	res := findFarthest(parsedData)
+
+	t1 := func() int {
+		return findFarthest(parsedData)
+	}
+	t2 := func() int {
+		path := buildPath(parsedData)
+		return enclosedTiles(parsedData, path)
+	}
+	res := common.HandleTasks(t1, t2)
 
 	fmt.Println(res)
 }
@@ -58,14 +71,45 @@ func parseData(data string) ParsedData {
 		network = append(network, runeRow)
 	}
 
-	return ParsedData{initX, initY, network}
+	return ParsedData{Point{initX, initY}, network}
+}
+
+func buildPath(data ParsedData) Path {
+	point := data.startingPoint
+	var path Path
+	path = append(path, point)
+	path = recurse(point.i, point.j, data.network, undefined, path)
+
+	return path
 }
 
 func findFarthest(data ParsedData) int {
-	return recurse(data.x, data.y, 0, data.network, undefined) / 2
+	path := buildPath(data)
+	return len(path) / 2
 }
 
-func recurse(i, j, agg int, grid Map, previous Direction) int {
+func enclosedTiles(data ParsedData, path Path) int {
+	count := 0
+	for i, row := range data.network {
+		for j := range row {
+			if !slices.Contains(path, Point{i, j}) {
+				intersections := 0
+				for k := j + 1; k < len(row); k++ {
+					p := Point{i, k}
+					if slices.Contains(path, p) && strings.ContainsRune("|F7", row[k]) {
+						intersections++
+					}
+				}
+				if intersections%2 == 1 {
+					count++
+				}
+			}
+		}
+	}
+	return count
+}
+
+func recurse(i, j int, grid Map, previous Direction, path Path) Path {
 	nextI, nextJ := 0, 0
 	switch {
 	case northWakable(i, j, grid) && previous != north:
@@ -84,12 +128,32 @@ func recurse(i, j, agg int, grid Map, previous Direction) int {
 		nextI, nextJ = -1, -1
 	}
 	if nextI == -1 && nextJ == -1 {
-		return -1
+		return []Point{}
 	}
+
+	pointToAdd := Point{nextI, nextJ}
 	if grid[nextI][nextJ] == 'S' {
-		return agg + 1
+		first := path[0]
+		second := path[1]
+
+		if grid[second.i][second.j] == grid[pointToAdd.i][pointToAdd.j] {
+			grid[first.i][first.j] = grid[pointToAdd.i][pointToAdd.j]
+		} else if previous == south && second.j > j || previous == east && second.i > i {
+			grid[first.i][first.j] = 'F'
+		} else if previous == west && second.i > i || previous == south && second.j < j {
+			grid[first.i][first.j] = '7'
+		} else if previous == north && second.j < j || previous == west && second.i < i {
+			grid[first.i][first.j] = 'J'
+		} else if previous == north && second.j > j || previous == east && second.i < i {
+			grid[first.i][first.j] = 'L'
+		}
+
+		return path
 	}
-	return recurse(nextI, nextJ, agg+1, grid, previous)
+
+	path = append(path, pointToAdd)
+
+	return recurse(nextI, nextJ, grid, previous, path)
 }
 
 func northWakable(i, j int, grid Map) bool {
