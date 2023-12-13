@@ -21,8 +21,7 @@ func main() {
 	bytes, _ := io.ReadAll(f)
 	rawImage := string(bytes)
 
-	n := common.HandleValue(1, 1_000_000)
-	fmt.Println(n)
+	n := common.HandleValue(2, 1_000_000)
 
 	parseImage(rawImage)
 	expandImage(1)
@@ -32,15 +31,10 @@ func main() {
 	parseImage(rawImage)
 	expandImage(2)
 	assignUniqueNumbers()
-	// second := calculateSum()
-	// diff := second - first
+	second := calculateSum()
+	diff := second - first
 
-	var total uint64 = uint64(first)
-	// for i := 1; i < n; i++ {
-	// 	fmt.Println(total)
-	// 	total = total + uint64(diff)
-	// }
-
+	var total uint64 = uint64(first) + uint64((n-1)*diff)
 	fmt.Println(total)
 
 }
