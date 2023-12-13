@@ -34,9 +34,9 @@ func HandleValue[T any](value1 T, value2 T) T {
 	choice := getChoice()
 
 	if choice == "2" {
-		return value1
-	} else {
 		return value2
+	} else {
+		return value1
 	}
 }
 

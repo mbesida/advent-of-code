@@ -20,16 +20,33 @@ func main() {
 	defer f.Close()
 	bytes, _ := io.ReadAll(f)
 	rawImage := string(bytes)
+
+	n := common.HandleValue(1, 1_000_000)
+	fmt.Println(n)
+
 	parseImage(rawImage)
-
-	expandImage()
+	expandImage(1)
 	assignUniqueNumbers()
+	first := calculateSum()
 
-	res := calculateSum()
-	fmt.Println(res)
+	parseImage(rawImage)
+	expandImage(2)
+	assignUniqueNumbers()
+	// second := calculateSum()
+	// diff := second - first
+
+	var total uint64 = uint64(first)
+	// for i := 1; i < n; i++ {
+	// 	fmt.Println(total)
+	// 	total = total + uint64(diff)
+	// }
+
+	fmt.Println(total)
+
 }
 
 func parseImage(rawImage string) {
+	image = nil
 	splitted := strings.Split(rawImage, "\n")
 	for _, s := range splitted {
 		row := make([]rune, len(s))
@@ -40,13 +57,16 @@ func parseImage(rawImage string) {
 	}
 }
 
-func expandImage() {
+func expandImage(n int) {
 	var expandedImage Image
+	magnitude := n - 1
 
 	for i := 0; i < len(image); i++ {
 		expandedImage = append(expandedImage, image[i])
 		if isBlank(image[i]) {
-			expandedImage = append(expandedImage, image[i])
+			for k := 0; k < magnitude; k++ {
+				expandedImage = append(expandedImage, image[i])
+			}
 		}
 	}
 
@@ -58,20 +78,22 @@ func expandImage() {
 		if isBlank(column) {
 			expandColumnImage := make([][]rune, len(expandedImage))
 			for i := range expandColumnImage {
-				expandColumnImage[i] = make([]rune, len(expandedImage[0])+1)
+				expandColumnImage[i] = make([]rune, len(expandedImage[0])+magnitude)
 			}
 			for k, row := range expandedImage {
 				for j, r := range row {
 					if j < i {
 						expandColumnImage[k][j] = r
 					} else {
-						expandColumnImage[k][j+1] = r
+						expandColumnImage[k][j+magnitude] = r
 					}
 				}
-				expandColumnImage[k][i] = column[k]
+				for x := 0; x < magnitude; x++ {
+					expandColumnImage[k][i+x] = column[k]
+				}
 			}
 			expandedImage = expandColumnImage
-			i++
+			i += magnitude
 		}
 	}
 
