@@ -6,6 +6,10 @@ import (
 	"os"
 )
 
+type Point struct {
+	I, J int
+}
+
 func HandleTasksWithErrors[T any](task1Func func() (T, error), task2Func func() (T, error)) (T, error) {
 	choice := getChoice()
 

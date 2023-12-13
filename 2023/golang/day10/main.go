@@ -10,9 +10,6 @@ import (
 )
 
 type Direction int
-type Point struct {
-	i, j int
-}
 
 const (
 	undefined Direction = iota
@@ -24,11 +21,11 @@ const (
 
 type Map = [][]rune
 type ParsedData struct {
-	startingPoint Point
+	startingPoint common.Point
 	network       Map
 }
 
-type Path []Point
+type Path []common.Point
 
 func main() {
 	f := common.InputFileHandle("day10")
@@ -71,14 +68,14 @@ func parseData(data string) ParsedData {
 		network = append(network, runeRow)
 	}
 
-	return ParsedData{Point{initX, initY}, network}
+	return ParsedData{common.Point{initX, initY}, network}
 }
 
 func buildPath(data ParsedData) Path {
 	point := data.startingPoint
 	var path Path
 	path = append(path, point)
-	path = recurse(point.i, point.j, data.network, undefined, path)
+	path = recurse(point.I, point.J, data.network, undefined, path)
 
 	return path
 }
@@ -92,10 +89,10 @@ func enclosedTiles(data ParsedData, path Path) int {
 	count := 0
 	for i, row := range data.network {
 		for j := range row {
-			if !slices.Contains(path, Point{i, j}) {
+			if !slices.Contains(path, common.Point{i, j}) {
 				intersections := 0
 				for k := j + 1; k < len(row); k++ {
-					p := Point{i, k}
+					p := common.Point{i, k}
 					if slices.Contains(path, p) && strings.ContainsRune("|F7", row[k]) {
 						intersections++
 					}
@@ -128,24 +125,24 @@ func recurse(i, j int, grid Map, previous Direction, path Path) Path {
 		nextI, nextJ = -1, -1
 	}
 	if nextI == -1 && nextJ == -1 {
-		return []Point{}
+		return []common.Point{}
 	}
 
-	pointToAdd := Point{nextI, nextJ}
+	pointToAdd := common.Point{I: nextI, J: nextJ}
 	if grid[nextI][nextJ] == 'S' {
 		first := path[0]
 		second := path[1]
 
-		if grid[second.i][second.j] == grid[pointToAdd.i][pointToAdd.j] {
-			grid[first.i][first.j] = grid[pointToAdd.i][pointToAdd.j]
-		} else if previous == south && second.j > j || previous == east && second.i > i {
-			grid[first.i][first.j] = 'F'
-		} else if previous == west && second.i > i || previous == south && second.j < j {
-			grid[first.i][first.j] = '7'
-		} else if previous == north && second.j < j || previous == west && second.i < i {
-			grid[first.i][first.j] = 'J'
-		} else if previous == north && second.j > j || previous == east && second.i < i {
-			grid[first.i][first.j] = 'L'
+		if grid[second.I][second.J] == grid[pointToAdd.I][pointToAdd.J] {
+			grid[first.I][first.J] = grid[pointToAdd.I][pointToAdd.J]
+		} else if previous == south && second.J > j || previous == east && second.I > i {
+			grid[first.I][first.J] = 'F'
+		} else if previous == west && second.I > i || previous == south && second.J < j {
+			grid[first.I][first.J] = '7'
+		} else if previous == north && second.J < j || previous == west && second.I < i {
+			grid[first.I][first.J] = 'J'
+		} else if previous == north && second.J > j || previous == east && second.I < i {
+			grid[first.I][first.J] = 'L'
 		}
 
 		return path
