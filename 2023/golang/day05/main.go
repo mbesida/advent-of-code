@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
+	"golang.org/x/exp/maps"
 )
 
 type Range struct {
@@ -201,10 +202,7 @@ func makeRanges(mapping []Mapping) map[Range]Range {
 func trasnformRanges(ranges []Range, dict map[Range]Range) []Range {
 	var newRanges []Range
 
-	keys := make([]Range, 0, len(dict))
-	for r2 := range dict {
-		keys = append(keys, r2)
-	}
+	keys := maps.Keys(dict)
 	slices.SortFunc(keys, func(k1, k2 Range) int {
 		if k1.start < k2.start {
 			return -1

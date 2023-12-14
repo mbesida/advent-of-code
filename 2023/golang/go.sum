@@ -1,2 +1,4 @@
 github.com/s0rg/trie v1.3.0 h1:VeMjAJdVvAMt06QlrLJs9B7tplwyxGtCPPZHfvW4Duo=
 github.com/s0rg/trie v1.3.0/go.mod h1:P+hJUWvPu/imKrsdzOrVswr8Mme6GgFtZfBKojYYkfk=
+golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb h1:c0vyKkb6yr3KR7jEfJaOSv4lG7xPkbN6r52aJz1d8a8=
+golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb/go.mod h1:iRJReGqOEeBhDZGkGbynYwcHlctCvnjTYIamk7uXpHI=

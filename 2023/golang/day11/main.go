@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
+	"golang.org/x/exp/maps"
 )
 
 type Image [][]rune
@@ -115,10 +116,7 @@ func distance(p1, p2 common.Point) int {
 }
 
 func calculateSum() int {
-	keys := make([]int, 0, len(galaxies))
-	for i := range galaxies {
-		keys = append(keys, i)
-	}
+	keys := maps.Keys(galaxies)
 
 	sum := 0
 	for i := 0; i < len(keys); i++ {

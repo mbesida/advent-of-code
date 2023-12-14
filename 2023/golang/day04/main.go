@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
+	"golang.org/x/exp/maps"
 )
 
 const cardRegexp = `Card *(\d+): +((\d{1,2} *)+)\| +((\d{1,2} *)+)`
@@ -41,10 +42,7 @@ func main() {
 	}
 
 	t2 := func() int {
-		keys := make([]int, 0, len(cards))
-		for k := range cards {
-			keys = append(keys, k)
-		}
+		keys := maps.Keys(cards)
 		slices.Sort(keys)
 		for _, id := range keys {
 			for _, card := range cards[id] {
