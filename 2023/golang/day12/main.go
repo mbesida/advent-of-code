@@ -76,26 +76,23 @@ func ways(s string, numbers []int, current int, consumedHash bool) int {
 		if len(numbers) == 0 && current == 0 {
 			return 1
 		}
-		return 0
+		return 0 //transformed input is invalid
 	}
 
 	switch s[0] {
 	case '.':
 		if current != 0 {
-			return 0
+			return 0 //transformed input is invalid
 		}
 		return ways(s[1:], numbers, current, false)
 
 	case '#':
 		switch {
-		case len(numbers) == 0 && current == 0:
-			return 0
+		case (len(numbers) == 0 || consumedHash) && current == 0:
+			return 0 //transformed input is invalid
 
 		case len(numbers) == 0:
 			return ways(s[1:], numbers, current-1, true)
-
-		case consumedHash && current == 0:
-			return 0
 
 		case current == 0:
 			current = numbers[0]
