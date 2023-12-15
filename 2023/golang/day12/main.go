@@ -21,13 +21,9 @@ func main() {
 
 	scanner := bufio.NewScanner(f)
 
-	var data []RowData
-	for scanner.Scan() {
-		data = append(data, parseLine(scanner.Text()))
-	}
-
 	sum := 0
-	for _, rd := range data {
+	for scanner.Scan() {
+		rd := parseLine(scanner.Text())
 		sum += arrangements(rd)
 	}
 
@@ -39,101 +35,78 @@ func parseLine(line string) RowData {
 	if len(splitted) != 2 {
 		log.Fatalf("incorrect file format on line %s", line)
 	}
-	numbersData := strings.Split(splitted[1], ",")
-	numbers := make([]int, len(numbersData))
+	n := common.HandleValue(1, 5)
+	var numbers []string
+	for i := 1; i <= n; i++ {
+		numbers = append(numbers, splitted[1])
+	}
+
+	var patterns []string
+	for i := 1; i <= n; i++ {
+		patterns = append(patterns, splitted[0])
+	}
+	numbersData := strings.Split(strings.Join(numbers, ","), ",")
+	ints := make([]int, len(numbersData))
 	for i, v := range numbersData {
-		numbers[i], _ = strconv.Atoi(v)
+		ints[i], _ = strconv.Atoi(v)
 	}
-	return RowData{numbers, splitted[0]}
+	return RowData{ints, strings.Join(patterns, "?")}
 }
 
-func isValid(rd RowData) bool {
-	partitions := strings.FieldsFunc(rd.pattern, func(r rune) bool { return r == '.' })
-
-	if len(partitions) != len(rd.numbers) {
-		return false
-	}
-
-	for i, p := range partitions {
-		if len(p) != rd.numbers[i] {
-			return false
-		}
-	}
-
-	return true
+type Key struct {
+	a, b, c int
+	d       bool
 }
 
-func generateCases(toFill int, questionIndexes []int, pattern string) []string {
-	var res []string
-	numbers := generateNumbers(len(questionIndexes), toFill)
-	countOfQuestionMarks := len(questionIndexes)
-	for _, n := range numbers {
-		binaryRepr := bitMap(countOfQuestionMarks, n)
-		patternBytes := []byte(pattern)
-		for i := 0; i < len(binaryRepr); i++ {
-			if binaryRepr[i] == '1' {
-				patternBytes[questionIndexes[i]] = '#'
-			}
-		}
-		res = append(res, strings.ReplaceAll(string(patternBytes), "?", "."))
-	}
+var memo map[Key]int = make(map[Key]int)
 
-	return res
-}
-
-func bitMap(questionsNumber, n int) string {
-	pattern := fmt.Sprintf("%%0%db", questionsNumber)
-	return fmt.Sprintf(pattern, n)
-}
-
-func countOnes(n int) int {
-	count := 0
-	for n > 0 {
-		n &= (n - 1)
-		count++
-	}
+func arrangements(rd RowData) int {
+	count := ways(rd.pattern, rd.numbers, 0, false)
+	clear(memo)
 	return count
 }
 
-func generateNumbers(n int, k int) []int {
-	var res []int
-	for i := 1; i < (1 << n); i++ {
-		if countOnes(i) == k {
-			res = append(res, i)
+func ways(s string, numbers []int, current int, consumedHash bool) int {
+	key := Key{len(s), len(numbers), current, consumedHash}
+	if v, ok := memo[key]; ok {
+		return v
+	}
+
+	if len(s) == 0 {
+		if len(numbers) == 0 && current == 0 {
+			return 1
 		}
+		return 0
 	}
-	return res
-}
 
-func questionIndexes(s string) []int {
-	var res []int
-	for i := 0; i < len(s); i++ {
-		if s[i] == '?' {
-			res = append(res, i)
+	switch s[0] {
+	case '.':
+		if current != 0 {
+			return 0
 		}
-	}
-	return res
-}
+		return ways(s[1:], numbers, current, false)
 
-func arrangements(rd RowData) int {
-	numbersSum := 0
-	for _, v := range rd.numbers {
-		numbersSum += v
-	}
+	case '#':
+		switch {
+		case len(numbers) == 0 && current == 0:
+			return 0
 
-	toFill := numbersSum - strings.Count(rd.pattern, "#")
-	if toFill == 0 {
-		return 1
-	}
+		case len(numbers) == 0:
+			return ways(s[1:], numbers, current-1, true)
 
-	cases := generateCases(toFill, questionIndexes(rd.pattern), rd.pattern)
+		case consumedHash && current == 0:
+			return 0
 
-	totalValid := 0
-	for _, c := range cases {
-		if isValid(RowData{rd.numbers, c}) {
-			totalValid++
+		case current == 0:
+			current = numbers[0]
+			numbers = numbers[1:]
 		}
-	}
+		return ways(s[1:], numbers, current-1, true)
 
-	return totalValid
+	default:
+		count := ways("."+s[1:], numbers, current, consumedHash)
+		count += ways("#"+s[1:], numbers, current, consumedHash)
+		memo[key] = count
+		return count
+	}
 }
