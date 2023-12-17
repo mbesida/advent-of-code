@@ -58,3 +58,18 @@ func getChoice() string {
 
 	return choice
 }
+
+func TransposeMatrix[T any](matrix [][]T) [][]T {
+	if len(matrix) <= 0 {
+		panic("zero sized matrix can't be transposed")
+	}
+	transposed := make([][]T, len(matrix[0]))
+	for i := 0; i < len(matrix[0]); i++ {
+		column := make([]T, len(matrix))
+		for j, row := range matrix {
+			column[j] = row[i]
+		}
+		transposed[i] = column
+	}
+	return transposed
+}
