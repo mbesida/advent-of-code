@@ -3,13 +3,15 @@ package main
 import (
 	"fmt"
 	"io"
-	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
 )
 
-type Note [][]rune
+type Note struct {
+	rows, columns []int64
+}
 
 func main() {
 	f := common.InputFileHandle("day13")
@@ -33,10 +35,17 @@ func parseNotes(data string) []Note {
 	groups := strings.Split(data, "\n\n")
 	n := len(groups)
 
-	notes := make([]Note, n)
+	rawData := make([][][]rune, n)
 	for i := 0; i < n; i++ {
 		rows := strings.Split(groups[i], "\n")
-		notes[i] = makeNoteRunes(rows)
+		rawData[i] = makeNoteRunes(rows)
+	}
+
+	notes := make([]Note, len(rawData))
+	for i, matrix := range rawData {
+		rows := convertToNumbers(matrix)
+		columns := convertToNumbers(common.TransposeMatrix(matrix))
+		notes[i] = Note{rows, columns}
 	}
 
 	return notes
@@ -45,32 +54,65 @@ func parseNotes(data string) []Note {
 func makeNoteRunes(data []string) [][]rune {
 	result := make([][]rune, len(data))
 	for i, line := range data {
-		result[i] = []rune(line)
+		runes := []rune(line)
+		for j, r := range runes {
+			if r == '#' {
+				runes[j] = '1'
+			} else {
+				runes[j] = '0'
+			}
+		}
+		result[i] = runes
 	}
 	return result
 }
 
-func calcReflection(data [][]rune) int {
-	transposedData := common.TransposeMatrix(data)
-
-	rows, a := findReflectionLinePosition(data)
-	columns, b := findReflectionLinePosition(transposedData)
-
-	var res int
-	if a {
-		res = 100 * rows
-	} else if b {
-		res = columns
+func convertToNumbers(data [][]rune) []int64 {
+	numbers := make([]int64, len(data))
+	for i, row := range data {
+		number, _ := strconv.ParseInt(string(row), 2, 64)
+		numbers[i] = number
 	}
-
-	return res
+	return numbers
 }
 
-func findReflectionLinePosition(data [][]rune) (int, bool) {
+func calcReflection(note Note) int {
+	rows, foundRows := findReflectionLinePosition(note.rows)
+	columns, foundColumns := findReflectionLinePosition(note.columns)
+
+	t1 := func() int {
+		var res int
+		if foundRows {
+			res = 100 * rows
+		} else if foundColumns {
+			res = columns
+		}
+		return res
+	}
+
+	t2 := func() int {
+		// var res int
+		// if a {
+		// 	for i, row := range data {
+		// 		for j, v := range row {
+
+		// 		}
+		// 	}
+		// 	res = 100 * rows
+		// } else if b {
+		// 	res = columns
+		// }
+		return 0
+	}
+
+	return common.HandleTasks(t1, t2)
+}
+
+func findReflectionLinePosition(data []int64) (int, bool) {
 	var positions []int
 	dataLen := len(data)
 	for i := 0; i < dataLen-1; i++ {
-		if slices.Compare(data[i], data[i+1]) == 0 {
+		if data[i] == data[i+1] {
 			positions = append(positions, i)
 		}
 	}
@@ -82,7 +124,7 @@ func findReflectionLinePosition(data [][]rune) (int, bool) {
 			foundI := true
 			behind, forward := i-1, i+2
 			for behind >= 0 && forward < dataLen {
-				if slices.Compare(data[behind], data[forward]) != 0 {
+				if data[behind] != data[forward] {
 					foundI = false
 					break
 				}
