@@ -3,15 +3,11 @@ package main
 import (
 	"fmt"
 	"io"
-	"strconv"
+	"math/bits"
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
 )
-
-type Note struct {
-	rows, columns []int64
-}
 
 func main() {
 	f := common.InputFileHandle("day13")
@@ -24,7 +20,7 @@ func main() {
 
 	sum := 0
 	for _, n := range notes {
-		x := calcReflection(n)
+		x := calcReflection1(n)
 		// fmt.Println(x)
 		sum += x
 	}
@@ -43,9 +39,7 @@ func parseNotes(data string) []Note {
 
 	notes := make([]Note, len(rawData))
 	for i, matrix := range rawData {
-		rows := convertToNumbers(matrix)
-		columns := convertToNumbers(common.TransposeMatrix(matrix))
-		notes[i] = Note{rows, columns}
+		notes[i] = NewNote(matrix)
 	}
 
 	return notes
@@ -67,77 +61,76 @@ func makeNoteRunes(data []string) [][]rune {
 	return result
 }
 
-func convertToNumbers(data [][]rune) []int64 {
-	numbers := make([]int64, len(data))
-	for i, row := range data {
-		number, _ := strconv.ParseInt(string(row), 2, 64)
-		numbers[i] = number
+func calcReflection1(note Note) int {
+	rowReflection, _ := findReflection(note.rows)
+	columnReflection, _ := findReflection(note.columns)
+
+	if rowReflection != nil {
+		return rowReflection.calc(true)
 	}
-	return numbers
+	if columnReflection != nil {
+		return columnReflection.calc(false)
+	}
+	return 0
 }
 
-func calcReflection(note Note) int {
-	rows, foundRows := findReflectionLinePosition(note.rows)
-	columns, foundColumns := findReflectionLinePosition(note.columns)
+func calcReflection2(note Note) int {
+	rowReflection, potenatialRows := findReflection(note.rows)
+	columnReflection, potenatialColumns := findReflection(note.columns)
 
-	t1 := func() int {
-		var res int
-		if foundRows {
-			res = 100 * rows
-		} else if foundColumns {
-			res = columns
-		}
-		return res
-	}
+	if rowReflection != nil {
+		// 1
+		if len(potenatialRows) > 1 {
+			for _, index := range potenatialRows {
+				if rowReflection.index != index {
 
-	t2 := func() int {
-		// var res int
-		// if a {
-		// 	for i, row := range data {
-		// 		for j, v := range row {
+					found := true
+					behind, forward := index-1, index+2
+					for behind >= 0 && forward < len(note.rows) {
+						if note.rows[behind] != note.rows[forward] {
+							xor := note.rows[behind] ^ note.rows[forward]
+							if bits.OnesCount64(uint64(xor)) != 1 {
+								found = false
+								break
+							}
+						}
+						behind--
+						forward++
+					}
+					if found {
 
-		// 		}
-		// 	}
-		// 	res = 100 * rows
-		// } else if b {
-		// 	res = columns
-		// }
-		return 0
-	}
-
-	return common.HandleTasks(t1, t2)
-}
-
-func findReflectionLinePosition(data []int64) (int, bool) {
-	var positions []int
-	dataLen := len(data)
-	for i := 0; i < dataLen-1; i++ {
-		if data[i] == data[i+1] {
-			positions = append(positions, i)
-		}
-	}
-
-	found := false
-	pos := 0
-	if len(positions) != 0 {
-		for _, i := range positions {
-			foundI := true
-			behind, forward := i-1, i+2
-			for behind >= 0 && forward < dataLen {
-				if data[behind] != data[forward] {
-					foundI = false
-					break
+					}
 				}
-				behind--
-				forward++
 			}
-			if foundI {
-				found = foundI
-				pos = i
-				break
-			}
+		}
+		return rowReflection.calc(true)
+	}
+	if columnReflection != nil {
+		return columnReflection.calc(false)
+	}
+	return 0
+}
+
+func findReflection(data []int64) (*Reflection, []int) {
+	positions := potentialReflectionPoints(data)
+
+	for _, i := range positions {
+		if checkPosition(i, data) {
+			return NewReflection(i, len(data)), positions
 		}
 	}
 
-	return pos + 1, found
+	return nil, positions
+}
+
+func checkPosition(i int, data []int64) bool {
+	behind, forward := i-1, i+2
+	for behind >= 0 && forward < len(data) {
+		if data[behind] != data[forward] {
+			return false
+		}
+		behind--
+		forward++
+	}
+	return true
 }
