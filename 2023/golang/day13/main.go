@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"math/bits"
+	"strconv"
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
@@ -20,8 +21,7 @@ func main() {
 
 	sum := 0
 	for _, n := range notes {
-		x := calcReflection1(n)
-		// fmt.Println(x)
+		x := calcReflection(n)
 		sum += x
 	}
 	fmt.Println(sum)
@@ -61,76 +61,125 @@ func makeNoteRunes(data []string) [][]rune {
 	return result
 }
 
-func calcReflection1(note Note) int {
-	rowReflection, _ := findReflection(note.rows)
-	columnReflection, _ := findReflection(note.columns)
+func calcReflection(note Note) int {
+	potentialRows := potentialReflectionPoints(note.rows)
+	potentialColumns := potentialReflectionPoints(note.columns)
+	rowReflection := findReflection(note.rows, potentialRows)
+	columnReflection := findReflection(note.columns, potentialColumns)
 
-	if rowReflection != nil {
-		return rowReflection.calc(true)
+	t1 := func() int {
+		if rowReflection != -1 {
+			return calculate(rowReflection, true)
+		}
+		if columnReflection != -1 {
+			return calculate(columnReflection, false)
+		}
+		return 0
 	}
-	if columnReflection != nil {
-		return columnReflection.calc(false)
+	t2 := func() int {
+		res := findAlternative(note.rows, rowReflection, potentialRows)
+		if res != -1 {
+			return calculate(res, true)
+		}
+		res = findAlternative(note.columns, columnReflection, potentialColumns)
+		if res != -1 {
+			return calculate(res, false)
+		}
+		return 0
 	}
-	return 0
+	return common.HandleTasks(t1, t2)
+
 }
 
-func calcReflection2(note Note) int {
-	rowReflection, potenatialRows := findReflection(note.rows)
-	columnReflection, potenatialColumns := findReflection(note.columns)
-
-	if rowReflection != nil {
-		// 1
-		if len(potenatialRows) > 1 {
-			for _, index := range potenatialRows {
-				if rowReflection.index != index {
-
-					found := true
-					behind, forward := index-1, index+2
-					for behind >= 0 && forward < len(note.rows) {
-						if note.rows[behind] != note.rows[forward] {
-							xor := note.rows[behind] ^ note.rows[forward]
-							if bits.OnesCount64(uint64(xor)) != 1 {
-								found = false
-								break
-							}
-						}
-						behind--
-						forward++
-					}
-					if found {
-
-					}
+func findAlternative(data []int64, pos int, potential []int) int {
+	dataLen := len(data)
+	if pos == -1 || len(potential) > 1 {
+		for _, index := range potential {
+			if pos != index {
+				if checkPosition(index, data, false) {
+					return index
 				}
 			}
 		}
-		return rowReflection.calc(true)
 	}
-	if columnReflection != nil {
-		return columnReflection.calc(false)
-	}
-	return 0
-}
 
-func findReflection(data []int64) (*Reflection, []int) {
-	positions := potentialReflectionPoints(data)
-
-	for _, i := range positions {
-		if checkPosition(i, data) {
-			return NewReflection(i, len(data)), positions
+	for i := 0; i < dataLen-1; i++ {
+		if isOneStepDistance(data[i], data[i+1]) {
+			if checkPosition(i, data, true) {
+				return i
+			}
 		}
 	}
 
-	return nil, positions
+	return -1
 }
 
-func checkPosition(i int, data []int64) bool {
+func findReflection(data []int64, potentialPositions []int) int {
+	for _, i := range potentialPositions {
+		if checkPosition(i, data, true) {
+			return i
+		}
+	}
+	return -1
+}
+
+// directComparisonOnly means that if we sould check only equality of elements
+func checkPosition(i int, data []int64, directComparisonOnly bool) bool {
 	behind, forward := i-1, i+2
 	for behind >= 0 && forward < len(data) {
-		if data[behind] != data[forward] {
-			return false
+		if directComparisonOnly {
+			if data[behind] != data[forward] {
+				return false
+			}
+		} else {
+			if data[behind] != data[forward] && !isOneStepDistance(data[behind], data[forward]) {
+				return false
+			}
 		}
 		behind--
 		forward++
 	}
 	return true
+}
+
+func isOneStepDistance(x, y int64) bool {
+	xor := x ^ y
+	return bits.OnesCount64(uint64(xor)) == 1
+}
+
+type Note struct {
+	rows, columns []int64
+}
+
+func NewNote(matrix [][]rune) Note {
+	transposedMatrix := common.TransposeMatrix(matrix)
+	rows := convertToNumbers(matrix)
+	columns := convertToNumbers(transposedMatrix)
+	return Note{rows, columns}
+}
+
+func convertToNumbers(data [][]rune) []int64 {
+	numbers := make([]int64, len(data))
+	for i, row := range data {
+		number, _ := strconv.ParseInt(string(row), 2, 64)
+		numbers[i] = number
+	}
+	return numbers
+}
+
+func potentialReflectionPoints(data []int64) []int {
+	var points []int
+	for i := 0; i < len(data)-1; i++ {
+		if data[i] == data[i+1] {
+			points = append(points, i)
+		}
+	}
+	return points
+}
+
+func calculate(index int, isRow bool) int {
+	if isRow {
+		return 100 * (index + 1)
+	}
+	return index + 1
 }
