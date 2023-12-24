@@ -132,7 +132,6 @@ func countEnegized() int {
 		for _, b := range line {
 			if b == 1 {
 				sum++
-			} else {
 			}
 		}
 	}
