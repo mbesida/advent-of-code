@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/mbesida/advent-of-code-2023/common"
 )
@@ -32,8 +33,14 @@ func main() {
 
 	parseLayout(f)
 
-	traceBeam(0, 0, Right)
-	fmt.Println(countEnegized())
+	t1 := func() int {
+		traceBeam(0, 0, Right)
+		return countEnegized()
+	}
+	t2 := func() int {
+		return traceAllEdgeBeams()
+	}
+	fmt.Println(common.HandleTasks(t1, t2))
 
 }
 
@@ -48,6 +55,39 @@ func parseLayout(reader io.Reader) {
 		layout = append(layout, newLine)
 		energized = append(energized, make([]byte, len(line)))
 	}
+}
+
+func resetData(n, m int) {
+	energized = nil
+	for i := 0; i < n; i++ {
+		energized = append(energized, make([]byte, m))
+	}
+	path = make(map[PathItem]struct{})
+}
+
+func traceAllEdgeBeams() int {
+	var results []int
+	n := len(layout)
+	m := len(layout[0])
+
+	for i := 0; i < n; i++ {
+		traceBeam(i, 0, Right)
+		results = append(results, countEnegized())
+		resetData(n, m)
+		traceBeam(i, m-1, Left)
+		results = append(results, countEnegized())
+		resetData(n, m)
+	}
+	for i := 0; i < m; i++ {
+		traceBeam(0, i, Down)
+		results = append(results, countEnegized())
+		resetData(n, m)
+		traceBeam(n-1, i, Up)
+		results = append(results, countEnegized())
+		resetData(n, m)
+	}
+
+	return slices.Max(results)
 }
 
 func traceBeam(i, j int, current Direction) {
