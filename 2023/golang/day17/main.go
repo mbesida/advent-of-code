@@ -7,6 +7,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
 	"github.com/rdleal/go-priorityq/kpq"
@@ -21,18 +22,34 @@ const (
 	Right
 )
 
-type Node struct {
-	p         common.Point
-	distnceTo int
+type Key struct {
+	point common.Point
+	path  string
 }
-type PreviousValue struct {
-	point     common.Point
-	direction Direction
+
+func NewKey(p common.Point) Key {
+	return Key{p, fmt.Sprintf("p%d,%d;", p.I, p.J)}
+}
+
+func (k Key) NextKey(nextPoint common.Point) Key {
+	return Key{nextPoint, k.path + fmt.Sprintf("p%d,%d;", nextPoint.I, nextPoint.J)}
+}
+
+func (k Key) buildPath() []common.Point {
+	var res []common.Point
+	points := strings.Split(k.path, ";")
+	for _, p := range points {
+		if p != "" {
+			ij := strings.Split(strings.TrimLeft(p, "p"), ",")
+			i, _ := strconv.Atoi(ij[0])
+			j, _ := strconv.Atoi(ij[1])
+			res = append(res, common.Point{i, j})
+		}
+	}
+	return res
 }
 
 var input [][]int
-
-var graph = make(map[common.Point][]Node)
 
 func main() {
 	f := common.InputFileHandle("day17")
@@ -40,30 +57,9 @@ func main() {
 
 	data, _ := io.ReadAll(f)
 	parseInput(data)
-	n, m := buildGraph()
-	res := dijkstra(common.Point{0, 0}, common.Point{n - 1, m - 1})
-
+	n, m := len(input), len(input[0])
+	res := dijkstra(0, 0, n-1, m-1)
 	fmt.Println(res)
-
-}
-
-func buildGraph() (int, int) {
-	n := len(input)
-	m := len(input[0])
-	for i, row := range input {
-		for j := range row {
-			var neighbors []Node
-			for _, points := range [][2]int{{i - 1, j}, {i + 1, j}, {i, j - 1}, {i, j + 1}} {
-				a := points[0]
-				b := points[1]
-				if 0 <= a && a < n && 0 <= b && b < m {
-					neighbors = append(neighbors, Node{common.Point{a, b}, input[a][b]})
-				}
-			}
-			graph[common.Point{i, j}] = neighbors
-		}
-	}
-	return n, m
 }
 
 func parseInput(data []byte) {
@@ -78,79 +74,88 @@ func parseInput(data []byte) {
 	}
 }
 
-func dijkstra(start, end common.Point) int {
-	distances := make(map[common.Point]int)
-	previous := make(map[common.Point]*PreviousValue)
-	for point := range graph {
-		distances[point] = math.MaxInt
-	}
-	distances[start] = 0
-
-	pq := kpq.NewKeyedPriorityQueue[common.Point, int](func(a, b int) bool {
+func dijkstra(startI, startJ, endI, endJ int) int {
+	n, m := len(input), len(input[0])
+	deltas := [4][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
+	pq := kpq.NewKeyedPriorityQueue[Key, int](func(a, b int) bool {
 		return a < b
 	})
-	pq.Push(start, 0)
 
+	distances := make([][]int, n)
+	visited := make([][]bool, n)
+	for i := 0; i < n; i++ {
+		visited[i] = make([]bool, m)
+		distances[i] = make([]int, m)
+		for j := 0; j < m; j++ {
+			distances[i][j] = math.MaxInt
+		}
+	}
+
+	pq.Push(NewKey(common.Point{startI, startJ}), 0)
+	distances[startI][startJ] = 0
+
+	// var path []common.Point
 	for !pq.IsEmpty() {
-		currentPoint, currentDistance, _ := pq.Pop()
-		if currentDistance > distances[currentPoint] {
-			continue
+		key, dist, _ := pq.Pop()
+		current := key.point
+		visited[current.I][current.J] = true
+		if visited[endI][endJ] {
+			// path = key.buildPath()
+			break
 		}
-		for _, neighbor := range graph[currentPoint] {
-			distanceToNeighbor := currentDistance + neighbor.distnceTo
-			if distanceToNeighbor < distances[neighbor.p] {
-				if hasMoreThan3consecutive(currentPoint, neighbor.p, previous) {
-					fmt.Println(neighbor.p)
-					continue
+		for _, delta := range deltas {
+			ni, nj := current.I+delta[0], current.J+delta[1]
+			next := common.Point{I: ni, J: nj}
+
+			if inBounds(ni, nj, n, m) && !visited[ni][nj] {
+				newDist := dist + input[ni][nj]
+				if !hasMoreThan3consecutive(next, key) {
+					pq.Push(key.NextKey(next), newDist)
 				}
-				distances[neighbor.p] = distanceToNeighbor
-				dir := direction(currentPoint, neighbor.p)
-				previous[neighbor.p] = &PreviousValue{currentPoint, dir}
-				pq.Push(neighbor.p, distanceToNeighbor)
+				if newDist <= distances[ni][nj] {
+					distances[ni][nj] = newDist
+				}
 			}
 		}
 	}
+	// sum := 0
+	// for _, p := range path {
+	// 	sum += input[p.I][p.J]
+	// }
+	// fmt.Println("sum is", sum-input[startI][startJ])
 
-	var path []common.Point
-	current := end
-	for previous[current] != nil {
-		path = append([]common.Point{current}, path...)
-		previousValue := *previous[current]
-		current = previousValue.point
-	}
+	// runes := make([][]string, n)
+	// for i := 0; i < n; i++ {
+	// 	runes[i] = make([]string, m)
+	// 	for j := 0; j < m; j++ {
+	// 		if slices.Contains(path, common.Point{i, j}) {
+	// 			runes[i][j] = " " + strconv.Itoa(input[i][j]) + "*"
+	// 		} else {
+	// 			runes[i][j] = " " + strconv.Itoa(input[i][j]) + " "
+	// 		}
+	// 	}
+	// }
+	// for _, p := range runes {
+	// 	fmt.Println(p)
+	// }
 
-	sum := 0
-	for _, p := range path {
-		sum += input[p.I][p.J]
-		// fmt.Println(p)
-	}
-	for i, row := range input {
-		for j := range row {
-			if slices.Contains(path, common.Point{i, j}) {
-				input[i][j] = 0
-			}
-		}
-	}
-	for _, row := range input {
-		fmt.Println(row)
-
-	}
-
-	return sum
-
+	return distances[endI][endJ]
 }
 
-func hasMoreThan3consecutive(currentPoint, nextPoint common.Point, previous map[common.Point]*PreviousValue) bool {
-	nextDirection := direction(currentPoint, nextPoint)
-	p1 := previous[currentPoint]
-	if p1 != nil {
-		p2 := previous[p1.point]
-		if p2 != nil {
-			currentDirection := direction(p1.point, currentPoint)
-			compactedDirections := slices.Compact([]Direction{nextDirection, currentDirection, p1.direction, p2.direction})
-			return len(compactedDirections) == 1
-		}
-
+func hasMoreThan3consecutive(next common.Point, key Key) bool {
+	points := key.buildPath()
+	l := len(points)
+	if l > 3 {
+		current := points[l-1]
+		p1 := points[l-2]
+		p2 := points[l-3]
+		p3 := points[l-4]
+		pn := direction(current, next)
+		p1p := direction(p1, current)
+		p2p1 := direction(p2, p1)
+		p3p2 := direction(p3, p2)
+		compactedDirections := slices.Compact([]Direction{pn, p1p, p2p1, p3p2})
+		return len(compactedDirections) == 1
 	}
 
 	return false
@@ -170,4 +175,8 @@ func direction(current, next common.Point) Direction {
 	}
 
 	return res
+}
+
+func inBounds(i, j int, n, m int) bool {
+	return 0 <= i && i < n && 0 <= j && j < m
 }
