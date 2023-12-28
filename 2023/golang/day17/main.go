@@ -13,6 +13,8 @@ import (
 
 type Direction int
 
+const isTracePath = false
+
 const (
 	Up Direction = iota
 	Down
@@ -91,6 +93,7 @@ func dijkstra(start, end Point, min, max int) int {
 	})
 
 	distances := make(map[Node]int)
+	prev := make(map[Node]Node)
 	distances[Node{start, Right, 0}] = 0
 	distances[Node{start, Down, 0}] = 0
 	pq.Push(Node{start, Right, 0}, 0)
@@ -111,8 +114,14 @@ func dijkstra(start, end Point, min, max int) int {
 			if !ok || (ok && newDist < gridDistance) {
 				pq.Push(neighbour, newDist)
 				distances[neighbour] = newDist
+				prev[neighbour] = node
 			}
 		}
+	}
+
+	if isTracePath {
+		path := buildPath(prev, distances, start, end, n, m, min, max)
+		tracePath(path, n, m)
 	}
 
 	return cost
@@ -160,4 +169,35 @@ func tracePath(path []Point, n, m int) {
 		}
 		fmt.Println()
 	}
+}
+
+func buildPath(prev map[Node]Node, distances map[Node]int, start, end Point, n, m, min, max int) []Point {
+	var path []Point
+	var current Node
+	var endNodes []Node
+	for i := min; i < min+max; i++ {
+		for _, d := range []Direction{Right, Down} {
+			n := Node{end, d, i}
+			if _, ok := prev[n]; ok {
+				endNodes = append(endNodes, n)
+			}
+		}
+	}
+	current = slices.MinFunc(endNodes, func(a, b Node) int {
+		if distances[a] < distances[b] {
+			return -1
+		}
+		return 1
+	})
+
+	for {
+		p, ok := prev[current]
+		if !ok {
+			break
+		}
+		path = append([]Point{current.point}, path...)
+		current = p
+	}
+
+	return path
 }
