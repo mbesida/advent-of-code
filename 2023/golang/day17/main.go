@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
 	"github.com/rdleal/go-priorityq/kpq"
@@ -16,38 +14,12 @@ import (
 type Direction int
 
 const (
-	Up Direction = iota
+	Undefined Direction = iota
+	Up
 	Down
 	Left
 	Right
 )
-
-type Key struct {
-	point common.Point
-	path  string
-}
-
-func NewKey(p common.Point) Key {
-	return Key{p, fmt.Sprintf("p%d,%d;", p.I, p.J)}
-}
-
-func (k Key) NextKey(nextPoint common.Point) Key {
-	return Key{nextPoint, k.path + fmt.Sprintf("p%d,%d;", nextPoint.I, nextPoint.J)}
-}
-
-func (k Key) buildPath() []common.Point {
-	var res []common.Point
-	points := strings.Split(k.path, ";")
-	for _, p := range points {
-		if p != "" {
-			ij := strings.Split(strings.TrimLeft(p, "p"), ",")
-			i, _ := strconv.Atoi(ij[0])
-			j, _ := strconv.Atoi(ij[1])
-			res = append(res, common.Point{i, j})
-		}
-	}
-	return res
-}
 
 var input [][]int
 
@@ -77,46 +49,53 @@ func parseInput(data []byte) {
 func dijkstra(startI, startJ, endI, endJ int) int {
 	n, m := len(input), len(input[0])
 	deltas := [4][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
-	pq := kpq.NewKeyedPriorityQueue[Key, int](func(a, b int) bool {
+	pq := kpq.NewKeyedPriorityQueue[common.Point, int](func(a, b int) bool {
 		return a < b
 	})
 
-	distances := make([][]int, n)
-	visited := make([][]bool, n)
+	distances := make(map[common.Point]int)
+	prev := make(map[common.Point]common.Point)
 	for i := 0; i < n; i++ {
-		visited[i] = make([]bool, m)
-		distances[i] = make([]int, m)
 		for j := 0; j < m; j++ {
-			distances[i][j] = math.MaxInt
+			point := common.Point{i, j}
+			distances[point] = math.MaxInt
+			pq.Push(point, distances[point])
 		}
 	}
-
-	pq.Push(NewKey(common.Point{startI, startJ}), 0)
-	distances[startI][startJ] = 0
+	start := common.Point{startI, startJ}
+	distances[start] = 0
+	pq.Update(start, distances[start])
 
 	// var path []common.Point
 	for !pq.IsEmpty() {
-		key, dist, _ := pq.Pop()
-		current := key.point
-		visited[current.I][current.J] = true
-		if visited[endI][endJ] {
-			// path = key.buildPath()
-			break
-		}
-		for _, delta := range deltas {
-			ni, nj := current.I+delta[0], current.J+delta[1]
-			next := common.Point{I: ni, J: nj}
+		point, dist, _ := pq.Pop()
 
-			if inBounds(ni, nj, n, m) && !visited[ni][nj] {
+		for _, delta := range deltas {
+			ni, nj := point.I+delta[0], point.J+delta[1]
+			next := common.Point{ni, nj}
+
+			if inBounds(ni, nj, n, m) {
 				newDist := dist + input[ni][nj]
-				if !hasMoreThan3consecutive(next, key) {
-					pq.Push(key.NextKey(next), newDist)
-				}
-				if newDist <= distances[ni][nj] {
-					distances[ni][nj] = newDist
+				if newDist < distances[next] {
+					distances[next] = newDist
+					pq.Update(next, newDist)
+					prev[next] = point
 				}
 			}
 		}
+	}
+	var path []common.Point
+	current := common.Point{endI, endJ}
+	for {
+		p, ok := prev[current]
+		if !ok {
+			break
+		}
+		path = append([]common.Point{current}, path...)
+		current = p
+	}
+	for _, p := range path {
+		fmt.Println(p)
 	}
 	// sum := 0
 	// for _, p := range path {
@@ -139,26 +118,7 @@ func dijkstra(startI, startJ, endI, endJ int) int {
 	// 	fmt.Println(p)
 	// }
 
-	return distances[endI][endJ]
-}
-
-func hasMoreThan3consecutive(next common.Point, key Key) bool {
-	points := key.buildPath()
-	l := len(points)
-	if l > 3 {
-		current := points[l-1]
-		p1 := points[l-2]
-		p2 := points[l-3]
-		p3 := points[l-4]
-		pn := direction(current, next)
-		p1p := direction(p1, current)
-		p2p1 := direction(p2, p1)
-		p3p2 := direction(p3, p2)
-		compactedDirections := slices.Compact([]Direction{pn, p1p, p2p1, p3p2})
-		return len(compactedDirections) == 1
-	}
-
-	return false
+	return distances[common.Point{endI, endJ}]
 }
 
 func direction(current, next common.Point) Direction {
