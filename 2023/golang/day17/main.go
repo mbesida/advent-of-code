@@ -42,15 +42,15 @@ type Node struct {
 	counter   int
 }
 
-func (node Node) neighbours(n, m int) []Node {
+func (node Node) neighbours(n, m int, min, max int) []Node {
 	var neigbours []Node
 	for _, p := range node.point.validNeigbourPoints(n, m) {
 		newDirection := direction(node.point, p)
 		if newDirection == oppositeDirection(node.direction) {
 			continue
-		} else if node.direction != newDirection {
+		} else if node.direction != newDirection && node.counter >= min {
 			neigbours = append(neigbours, Node{p, newDirection, 1})
-		} else if node.counter < 3 {
+		} else if node.direction == newDirection && node.counter < max {
 			neigbours = append(neigbours, Node{p, newDirection, node.counter + 1})
 		}
 	}
@@ -65,8 +65,10 @@ func main() {
 
 	data, _ := io.ReadAll(f)
 	parseInput(data)
+	min := common.HandleValue(1, 4)
+	max := common.HandleValue(3, 10)
 	n, m := len(input), len(input[0])
-	res := dijkstra(Point{0, 0}, Point{n - 1, m - 1})
+	res := dijkstra(Point{0, 0}, Point{n - 1, m - 1}, min, max)
 	fmt.Println(res)
 }
 
@@ -82,7 +84,7 @@ func parseInput(data []byte) {
 	}
 }
 
-func dijkstra(start, end Point) int {
+func dijkstra(start, end Point, min, max int) int {
 	n, m := len(input), len(input[0])
 	pq := kpq.NewKeyedPriorityQueue[Node, int](func(a, b int) bool {
 		return a < b
@@ -103,7 +105,7 @@ func dijkstra(start, end Point) int {
 			break
 		}
 
-		for _, neighbour := range node.neighbours(n, m) {
+		for _, neighbour := range node.neighbours(n, m, min, max) {
 			newDist := dist + input[neighbour.point.x][neighbour.point.y]
 			gridDistance, ok := distances[neighbour]
 			if !ok || (ok && newDist < gridDistance) {
