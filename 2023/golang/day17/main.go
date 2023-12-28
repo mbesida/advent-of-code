@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math"
+	"slices"
 	"strconv"
 
 	"github.com/mbesida/advent-of-code-2023/common"
@@ -14,12 +14,48 @@ import (
 type Direction int
 
 const (
-	Undefined Direction = iota
-	Up
+	Up Direction = iota
 	Down
 	Left
 	Right
 )
+
+type Point struct {
+	x, y int
+}
+
+func (p Point) validNeigbourPoints(n, m int) []Point {
+	var neigbours []Point
+	for _, delta := range [4][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}} {
+		nx := p.x + delta[0]
+		ny := p.y + delta[1]
+		if nx >= 0 && nx < n && ny >= 0 && ny < m {
+			neigbours = append(neigbours, Point{nx, ny})
+		}
+	}
+	return neigbours
+}
+
+type Node struct {
+	point     Point
+	direction Direction
+	counter   int
+}
+
+func (node Node) neighbours(n, m int) []Node {
+	var neigbours []Node
+	for _, p := range node.point.validNeigbourPoints(n, m) {
+		newDirection := direction(node.point, p)
+		if newDirection == oppositeDirection(node.direction) {
+			continue
+		} else if node.direction != newDirection {
+			neigbours = append(neigbours, Node{p, newDirection, 1})
+		} else if node.counter < 3 {
+			neigbours = append(neigbours, Node{p, newDirection, node.counter + 1})
+		}
+	}
+	return neigbours
+}
 
 var input [][]int
 
@@ -30,7 +66,7 @@ func main() {
 	data, _ := io.ReadAll(f)
 	parseInput(data)
 	n, m := len(input), len(input[0])
-	res := dijkstra(0, 0, n-1, m-1)
+	res := dijkstra(Point{0, 0}, Point{n - 1, m - 1})
 	fmt.Println(res)
 }
 
@@ -46,97 +82,80 @@ func parseInput(data []byte) {
 	}
 }
 
-func dijkstra(startI, startJ, endI, endJ int) int {
+func dijkstra(start, end Point) int {
 	n, m := len(input), len(input[0])
-	deltas := [4][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
-	pq := kpq.NewKeyedPriorityQueue[common.Point, int](func(a, b int) bool {
+	pq := kpq.NewKeyedPriorityQueue[Node, int](func(a, b int) bool {
 		return a < b
 	})
 
-	distances := make(map[common.Point]int)
-	prev := make(map[common.Point]common.Point)
-	for i := 0; i < n; i++ {
-		for j := 0; j < m; j++ {
-			point := common.Point{i, j}
-			distances[point] = math.MaxInt
-			pq.Push(point, distances[point])
-		}
-	}
-	start := common.Point{startI, startJ}
-	distances[start] = 0
-	pq.Update(start, distances[start])
+	distances := make(map[Node]int)
+	distances[Node{start, Right, 0}] = 0
+	distances[Node{start, Down, 0}] = 0
+	pq.Push(Node{start, Right, 0}, 0)
+	pq.Push(Node{start, Down, 0}, 0)
 
-	// var path []common.Point
+	var cost int
 	for !pq.IsEmpty() {
-		point, dist, _ := pq.Pop()
+		node, dist, _ := pq.Pop()
 
-		for _, delta := range deltas {
-			ni, nj := point.I+delta[0], point.J+delta[1]
-			next := common.Point{ni, nj}
+		if node.point == end {
+			cost = dist
+			break
+		}
 
-			if inBounds(ni, nj, n, m) {
-				newDist := dist + input[ni][nj]
-				if newDist < distances[next] {
-					distances[next] = newDist
-					pq.Update(next, newDist)
-					prev[next] = point
-				}
+		for _, neighbour := range node.neighbours(n, m) {
+			newDist := dist + input[neighbour.point.x][neighbour.point.y]
+			gridDistance, ok := distances[neighbour]
+			if !ok || (ok && newDist < gridDistance) {
+				pq.Push(neighbour, newDist)
+				distances[neighbour] = newDist
 			}
 		}
 	}
-	var path []common.Point
-	current := common.Point{endI, endJ}
-	for {
-		p, ok := prev[current]
-		if !ok {
-			break
-		}
-		path = append([]common.Point{current}, path...)
-		current = p
-	}
-	for _, p := range path {
-		fmt.Println(p)
-	}
-	// sum := 0
-	// for _, p := range path {
-	// 	sum += input[p.I][p.J]
-	// }
-	// fmt.Println("sum is", sum-input[startI][startJ])
 
-	// runes := make([][]string, n)
-	// for i := 0; i < n; i++ {
-	// 	runes[i] = make([]string, m)
-	// 	for j := 0; j < m; j++ {
-	// 		if slices.Contains(path, common.Point{i, j}) {
-	// 			runes[i][j] = " " + strconv.Itoa(input[i][j]) + "*"
-	// 		} else {
-	// 			runes[i][j] = " " + strconv.Itoa(input[i][j]) + " "
-	// 		}
-	// 	}
-	// }
-	// for _, p := range runes {
-	// 	fmt.Println(p)
-	// }
-
-	return distances[common.Point{endI, endJ}]
+	return cost
 }
 
-func direction(current, next common.Point) Direction {
+func direction(current, next Point) Direction {
 	var res Direction
 	switch {
-	case current.I == next.I && current.J+1 == next.J:
+	case current.x == next.x && current.y+1 == next.y:
 		res = Right
-	case current.I == next.I && current.J-1 == next.J:
+	case current.x == next.x && current.y-1 == next.y:
 		res = Left
-	case current.I+1 == next.I && current.J == next.J:
+	case current.x+1 == next.x && current.y == next.y:
 		res = Down
-	case current.I-1 == next.I && current.J == next.J:
+	case current.x-1 == next.x && current.y == next.y:
 		res = Up
 	}
 
 	return res
 }
 
-func inBounds(i, j int, n, m int) bool {
-	return 0 <= i && i < n && 0 <= j && j < m
+func oppositeDirection(d Direction) Direction {
+	var opposite Direction
+	switch d {
+	case Up:
+		opposite = Down
+	case Down:
+		opposite = Up
+	case Right:
+		opposite = Left
+	case Left:
+		opposite = Right
+	}
+	return opposite
+}
+
+func tracePath(path []Point, n, m int) {
+	for i := 0; i < n; i++ {
+		for j := 0; j < m; j++ {
+			if slices.Contains(path, Point{i, j}) {
+				fmt.Print(" " + strconv.Itoa(input[i][j]) + "*")
+			} else {
+				fmt.Print(" " + strconv.Itoa(input[i][j]) + " ")
+			}
+		}
+		fmt.Println()
+	}
 }
