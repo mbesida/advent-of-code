@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"math"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -83,15 +85,31 @@ func main() {
 	defer f.Close()
 
 	lines := parseFile(f)
-	buildTerrain(lines)
+	depth := buildTerrain(lines)
 
-	fmt.Println(countMeters())
+	fmt.Println(uint64(countMeters()) * uint64(depth) * uint64(depth))
 }
 
-func buildTerrain(fileRows []FileRow) {
+func buildTerrain(fileRows []*FileRow) int {
 	var i, j, startI, startJ int
 	var n, m int
+
+	t1 := func() int {
+		return 1
+	}
+	t2 := func() int {
+		return slices.MinFunc(fileRows, func(r1, r2 *FileRow) int {
+			if r1.n < r2.n {
+				return -1
+			}
+			return 1
+		}).n
+	}
+
+	depth := common.HandleTasks(t1, t2)
+
 	for k, row := range fileRows {
+		row.n /= depth
 		if k == 0 {
 			switch row.dir {
 			case Left:
@@ -156,32 +174,71 @@ func buildTerrain(fileRows []FileRow) {
 		terrain[i] = make([]int, m)
 	}
 
+	fmt.Println("rows =", n, "; columns =", m)
+	fmt.Println("initI = ", startI, "; initJ = ", startJ)
+
 	markTerrainBorders(startI, startJ, n, m, fileRows)
+
 	fillTerrain(n, m)
+
+	return depth
 }
 
-func parseFile(r io.Reader) []FileRow {
-	var res []FileRow
+func printTerrain() {
+	var sb strings.Builder
+	for _, row := range terrain {
+		for _, v := range row {
+			sb.WriteString(strconv.Itoa(v))
+		}
+		fmt.Println(sb.String())
+		sb.Reset()
+	}
+}
+
+func parseFile(r io.Reader) []*FileRow {
+	var res []*FileRow
 	s := bufio.NewScanner(r)
 	for s.Scan() {
 		line := s.Text()
 		data := strings.Fields(line)
 		n, _ := strconv.Atoi(data[1])
-		switch data[0] {
+		re := regexp.MustCompile(`\(#([0-9a-f]{6})\)`)
+		colorData := re.FindStringSubmatch(data[2])
+		if len(colorData) < 2 {
+			log.Fatalf("incorrect format of color %s", line)
+		}
+		hexString := colorData[1]
+		number, _ := strconv.ParseInt(hexString[:len(hexString)-1], 16, 64)
+		var hexDir string
+		switch hexString[len(hexString)-1] {
+		case '2':
+			hexDir = "L"
+		case '0':
+			hexDir = "R"
+		case '1':
+			hexDir = "D"
+		case '3':
+			hexDir = "U"
+		}
+
+		direction := common.HandleValue(data[0], hexDir)
+		x := common.HandleValue(n, int(number))
+
+		switch direction {
 		case "L":
-			res = append(res, FileRow{Left, n})
+			res = append(res, &FileRow{Left, x})
 		case "R":
-			res = append(res, FileRow{Right, n})
+			res = append(res, &FileRow{Right, x})
 		case "D":
-			res = append(res, FileRow{Down, n})
+			res = append(res, &FileRow{Down, x})
 		case "U":
-			res = append(res, FileRow{Up, n})
+			res = append(res, &FileRow{Up, x})
 		}
 	}
 	return res
 }
 
-func markTerrainBorders(startI, startJ, n, m int, fileRows []FileRow) {
+func markTerrainBorders(startI, startJ, n, m int, fileRows []*FileRow) {
 	// build terrain borders
 	i, j := startI, startJ
 	terrain[i][j] = 1
@@ -209,7 +266,6 @@ func markTerrainBorders(startI, startJ, n, m int, fileRows []FileRow) {
 			}
 		}
 		lines = append(lines, NewLine(p1, p2))
-
 	}
 }
 
@@ -222,15 +278,32 @@ func fillTerrain(n, m int) {
 	}
 
 	for i := 0; i < n; i++ {
+		inPolygonMarker := 1
+		doCalc := true
 		for j := 0; j < m; j++ {
-			if terrain[i][j] == 0 && isInPolygon(i, j, linesByRow) {
-				terrain[i][j] = 1
+			if terrain[i][j] == 1 {
+				inPolygonMarker = 1
+				doCalc = true
+			}
+			if terrain[i][j] == 0 {
+				if inPolygonMarker == 1 {
+					if doCalc {
+						if isInPolygon(i, j, linesByRow) {
+							terrain[i][j] = inPolygonMarker
+						} else {
+							inPolygonMarker = 0
+						}
+						doCalc = false
+					} else {
+						terrain[i][j] = inPolygonMarker
+					}
+				}
 			}
 		}
 	}
 }
 
-// ray cast algo
+// ray cast algorithm
 func isInPolygon(i, j int, linesByRow map[int][]Line) bool {
 	l1 := NewLine(common.Point{i, j}, common.Point{i, math.MaxInt})
 	intersectCount := 0
