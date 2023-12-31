@@ -30,15 +30,25 @@ type Workflow struct {
 }
 
 type StateItem struct {
-	lower, upper int
+	lower, upper             int
+	lowerStrict, upperStrict bool
 }
 
 func NewState() StateItem {
-	return StateItem{1, 4000}
+	return StateItem{1, 4000, false, false}
 }
 
 func (s StateItem) isNotValid() bool {
 	return s.lower > s.upper
+}
+func (s StateItem) diff() int {
+	if s.lowerStrict {
+		s.lower++
+	}
+	if s.upperStrict {
+		s.upper--
+	}
+	return s.upper - s.lower + 1
 }
 
 func main() {
@@ -194,17 +204,18 @@ type Foo struct {
 
 func traverse(workflows map[string]Workflow) uint64 {
 	var sum uint64 = 0
+	var agg [][4]StateItem
 
 	queue := []Foo{{"in", [4]StateItem{NewState(), NewState(), NewState(), NewState()}}}
 	for len(queue) != 0 {
 		current := queue[0]
 		queue = queue[1:]
-		// fmt.Println(current.name)
 		if current.name == "A" {
 			var combinations uint64 = 1
 			for _, s := range current.state {
-				combinations *= uint64(s.upper) - uint64(s.lower) + 1
+				combinations *= uint64(s.diff())
 			}
+			agg = append(agg, current.state)
 			sum += combinations
 			continue
 		}
@@ -218,40 +229,42 @@ func traverse(workflows map[string]Workflow) uint64 {
 			if cond.rule != nil {
 				switch [2]string{cond.rule.element, cond.rule.condition} {
 				case [2]string{"x", "<"}:
-					left = updateState(0, right, cond.rule.value, true)
-					right = updateState(0, right, cond.rule.value, false)
+					left = updateState(0, right, cond.rule.value, true, true)
+					right = updateState(0, right, cond.rule.value, true, false)
 
 				case [2]string{"x", ">"}:
-					left = updateState(0, right, cond.rule.value, false)
-					right = updateState(0, right, cond.rule.value, true)
+					left = updateState(0, right, cond.rule.value, false, true)
+					right = updateState(0, right, cond.rule.value, false, false)
 
 				case [2]string{"m", "<"}:
-					left = updateState(1, right, cond.rule.value, true)
-					right = updateState(1, right, cond.rule.value, false)
+					left = updateState(1, right, cond.rule.value, true, true)
+					right = updateState(1, right, cond.rule.value, true, false)
 
 				case [2]string{"m", ">"}:
-					left = updateState(1, right, cond.rule.value, false)
-					right = updateState(1, right, cond.rule.value, true)
+					left = updateState(1, right, cond.rule.value, false, true)
+					right = updateState(1, right, cond.rule.value, false, false)
 
 				case [2]string{"a", "<"}:
-					left = updateState(2, right, cond.rule.value, true)
-					right = updateState(2, right, cond.rule.value, false)
+					left = updateState(2, right, cond.rule.value, true, true)
+					right = updateState(2, right, cond.rule.value, true, false)
 
 				case [2]string{"a", ">"}:
-					left = updateState(2, right, cond.rule.value, false)
-					right = updateState(2, right, cond.rule.value, true)
+					left = updateState(2, right, cond.rule.value, false, true)
+					right = updateState(2, right, cond.rule.value, false, false)
 
 				case [2]string{"s", "<"}:
-					left = updateState(3, right, cond.rule.value, true)
-					right = updateState(3, right, cond.rule.value, false)
+					left = updateState(3, right, cond.rule.value, true, true)
+					right = updateState(3, right, cond.rule.value, true, false)
 
 				case [2]string{"s", ">"}:
-					left = updateState(3, right, cond.rule.value, false)
-					right = updateState(3, right, cond.rule.value, true)
+					left = updateState(3, right, cond.rule.value, false, true)
+					right = updateState(3, right, cond.rule.value, false, false)
 				}
 
-				if !slices.ContainsFunc(current.state[:], func(si StateItem) bool { return si.isNotValid() }) {
+				if !slices.ContainsFunc(left[:], func(si StateItem) bool { return si.isNotValid() }) {
 					queue = append(queue, Foo{cond.next, left})
+				} else {
+					fmt.Println("----")
 				}
 			} else {
 				queue = append(queue, Foo{cond.next, right})
@@ -259,27 +272,35 @@ func traverse(workflows map[string]Workflow) uint64 {
 
 		}
 	}
+	for _, v := range agg {
+		fmt.Println(v)
+	}
 
 	return sum
 }
 
-func updateState(i int, states [4]StateItem, value int, lowerBound bool) [4]StateItem {
+func updateState(i int, states [4]StateItem, value int, upperBound bool, notOpposite bool) [4]StateItem {
 	newStates := states
-	if lowerBound {
-		if states[i].upper > value {
-			newStates[i] = StateItem{states[i].lower, value}
+	if upperBound {
+		if notOpposite {
+			if states[i].upper > value {
+				newStates[i] = StateItem{states[i].lower, value, states[i].upperStrict, true}
+			}
+		} else {
+			if states[i].lower <= value {
+				newStates[i] = StateItem{value, states[i].upper, false, states[i].upperStrict}
+			}
 		}
 	} else {
-		if states[i].lower < value {
-			newStates[i] = StateItem{value, states[i].upper}
+		if notOpposite {
+			if states[i].lower < value {
+				newStates[i] = StateItem{value, states[i].upper, true, states[i].upperStrict}
+			}
+		} else {
+			if states[i].upper >= value {
+				newStates[i] = StateItem{states[i].lower, value, states[i].lowerStrict, false}
+			}
 		}
 	}
 	return newStates
-}
-
-func pushState(q []Foo, next string, state [4]StateItem) []Foo {
-	if !slices.ContainsFunc(state[:], func(si StateItem) bool { return si.isNotValid() }) {
-		q = append(q, Foo{next, state})
-	}
-	return q
 }
