@@ -35,13 +35,13 @@ func main() {
 	fileRows := parseFile(f)
 	points := buildPoints(fileRows)
 	makePositiveCoordinates(points)
-	points = reorganizePoints(points)
+	points = reorderPoints(points)
 	area := calcArea(points)
 
 	fmt.Println(area)
 }
 
-func calcArea(points []common.Point) int {
+func calcArea(points []common.Point) uint64 {
 	n := len(points)
 	is := make([]int, n)
 	js := make([]int, n)
@@ -51,20 +51,20 @@ func calcArea(points []common.Point) int {
 	}
 
 	// shoelace area
-	doubleArea := 0
+	var doubleArea uint64 = 0
 	for i := 0; i < n-1; i++ {
-		doubleArea += is[i] * js[i+1]
-		doubleArea -= is[i+1] * js[i]
+		doubleArea += uint64(is[i]) * uint64(js[i+1])
+		doubleArea -= uint64(is[i+1]) * uint64(js[i])
 	}
 
-	perimeter := 0
+	var perimeter uint64 = 0
 	for i := 1; i < n; i++ {
 		prev := points[i-1]
 		p := points[i]
 		if prev.I == p.I {
-			perimeter += int(math.Abs(float64(p.J) - float64(prev.J)))
+			perimeter += uint64(math.Abs(float64(p.J) - float64(prev.J)))
 		} else {
-			perimeter += int(math.Abs(float64(p.I) - float64(prev.I)))
+			perimeter += uint64(math.Abs(float64(p.I) - float64(prev.I)))
 		}
 	}
 
@@ -74,20 +74,36 @@ func calcArea(points []common.Point) int {
 	return countInsidePoints + perimeter
 }
 
-func reorganizePoints(points []common.Point) []common.Point {
-	reorganizedPoints := points
-	first := points[0]
-	second := points[1]
-	last := points[len(points)-1]
-	if first.I == second.I {
-		if first.J < second.J {
-			tail := reorganizedPoints[1 : len(reorganizedPoints)-1]
-			slices.Reverse(tail)
-			reorganizedPoints = append([]common.Point{first}, tail...)
-			reorganizedPoints = append(reorganizedPoints, last)
+// reorder points for counterclockwise traversal according to shoelace formula
+func reorderPoints(points []common.Point) []common.Point {
+	uniquePoints := points[:len(points)-1]
+	nu := len(uniquePoints)
+	minPoint := slices.MinFunc(uniquePoints, func(a, b common.Point) int {
+		if (a.J == b.J && a.I < b.I) || a.J < b.J {
+			return -1
 		}
+
+		return 1
+	})
+	indexOfMinPoint := slices.Index(uniquePoints, minPoint)
+	var reorderedPoints []common.Point
+	if minPoint.I < uniquePoints[indexOfMinPoint+1%nu].I {
+		reorderedPoints = points
+	} else {
+		if indexOfMinPoint+1 < len(uniquePoints) {
+			before, after := uniquePoints[:indexOfMinPoint], uniquePoints[indexOfMinPoint+1:]
+			slices.Reverse(before)
+			slices.Reverse(after)
+			reorderedPoints = append([]common.Point{minPoint}, before...)
+			reorderedPoints = append(reorderedPoints, after...)
+		} else {
+			slices.Reverse(uniquePoints)
+			reorderedPoints = uniquePoints
+		}
+		reorderedPoints = append(reorderedPoints, minPoint)
 	}
-	return reorganizedPoints
+
+	return reorderedPoints
 }
 
 func buildPoints(fileRows []FileRow) []common.Point {
