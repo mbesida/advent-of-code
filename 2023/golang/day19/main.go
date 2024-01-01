@@ -282,6 +282,12 @@ func traverse(workflows map[string]Workflow) uint64 {
 	}
 	for _, v := range agg {
 		fmt.Println(v)
+		var foo uint64 = 1
+		for _, s := range v {
+			foo *= uint64(s.diff())
+		}
+		fmt.Println(foo)
+		// fmt.Println()
 	}
 	fmt.Println(len(agg))
 
