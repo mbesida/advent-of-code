@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -27,35 +26,6 @@ type Workflow struct {
 	name  string
 	rules []func(p Part) string
 	conds []Condition
-}
-
-type StateItem struct {
-	lower, upper             int
-	lowerStrict, upperStrict bool
-}
-
-func NewState() StateItem {
-	return StateItem{1, 4000, false, false}
-}
-
-func (s StateItem) adjust() (int, int) {
-	a, b := s.lower, s.upper
-	if s.lowerStrict {
-		a++
-	}
-	if s.upperStrict {
-		b--
-	}
-	return a, b
-}
-
-func (s StateItem) isNotValid() bool {
-	res := s.diff()
-	return res <= 0
-}
-func (s StateItem) diff() int {
-	lower, upper := s.adjust()
-	return upper - lower + 1
 }
 
 func main() {
@@ -204,26 +174,73 @@ func parseParts(data string) map[Part]bool {
 	return res
 }
 
+type State struct {
+	lower, upper Part
+}
+
+func NewState() State {
+	return State{Part{1, 1, 1, 1}, Part{4000, 4000, 4000, 4000}}
+}
+
+func (f State) combinations() uint64 {
+	var combinations uint64 = 1
+	combinations *= uint64(f.upper.x) - uint64(f.lower.x) + 1
+	combinations *= uint64(f.upper.m) - uint64(f.lower.m) + 1
+	combinations *= uint64(f.upper.a) - uint64(f.lower.a) + 1
+	combinations *= uint64(f.upper.s) - uint64(f.lower.s) + 1
+	return combinations
+}
+func (f State) updateX(value int, upper bool) State {
+	var new State
+	if upper {
+		new = State{f.lower, Part{value, f.upper.m, f.upper.a, f.upper.s}}
+	} else {
+		new = State{Part{value, f.lower.m, f.lower.a, f.lower.s}, f.upper}
+	}
+	return new
+}
+func (f State) updateM(value int, upper bool) State {
+	var new State
+	if upper {
+		new = State{f.lower, Part{f.upper.x, value, f.upper.a, f.upper.s}}
+	} else {
+		new = State{Part{f.lower.x, value, f.lower.a, f.lower.s}, f.upper}
+	}
+	return new
+}
+func (f State) updateA(value int, upper bool) State {
+	var new State
+	if upper {
+		new = State{f.lower, Part{f.upper.x, f.upper.m, value, f.upper.s}}
+	} else {
+		new = State{Part{f.lower.x, f.lower.m, value, f.lower.s}, f.upper}
+	}
+	return new
+}
+func (f State) updateS(value int, upper bool) State {
+	var new State
+	if upper {
+		new = State{f.lower, Part{f.upper.x, f.upper.m, f.upper.a, value}}
+	} else {
+		new = State{Part{f.lower.x, f.lower.m, f.lower.a, value}, f.upper}
+	}
+	return new
+}
+
 type Foo struct {
 	name  string
-	state [4]StateItem
+	state State
 }
 
 func traverse(workflows map[string]Workflow) uint64 {
 	var sum uint64 = 0
-	var agg [][4]StateItem
 
-	queue := []Foo{{"in", [4]StateItem{NewState(), NewState(), NewState(), NewState()}}}
+	queue := []Foo{{"in", NewState()}}
 	for len(queue) != 0 {
 		current := queue[0]
 		queue = queue[1:]
 		if current.name == "A" {
-			var combinations uint64 = 1
-			for _, s := range current.state {
-				combinations *= uint64(s.diff())
-			}
-			agg = append(agg, current.state)
-			sum += combinations
+			sum += current.state.combinations()
 			continue
 		}
 		if current.name == "R" {
@@ -232,90 +249,93 @@ func traverse(workflows map[string]Workflow) uint64 {
 
 		w := workflows[current.name]
 		for _, cond := range w.conds {
-			left, right := current.state, current.state
-			if cond.rule != nil {
-				switch [2]string{cond.rule.element, cond.rule.condition} {
-				case [2]string{"x", "<"}:
-					left = updateState(0, right, cond.rule.value, true, true)
-					right = updateState(0, right, cond.rule.value, true, false)
-
-				case [2]string{"x", ">"}:
-					left = updateState(0, right, cond.rule.value, false, true)
-					right = updateState(0, right, cond.rule.value, false, false)
-
-				case [2]string{"m", "<"}:
-					left = updateState(1, right, cond.rule.value, true, true)
-					right = updateState(1, right, cond.rule.value, true, false)
-
-				case [2]string{"m", ">"}:
-					left = updateState(1, right, cond.rule.value, false, true)
-					right = updateState(1, right, cond.rule.value, false, false)
-
-				case [2]string{"a", "<"}:
-					left = updateState(2, right, cond.rule.value, true, true)
-					right = updateState(2, right, cond.rule.value, true, false)
-
-				case [2]string{"a", ">"}:
-					left = updateState(2, right, cond.rule.value, false, true)
-					right = updateState(2, right, cond.rule.value, false, false)
-
-				case [2]string{"s", "<"}:
-					left = updateState(3, right, cond.rule.value, true, true)
-					right = updateState(3, right, cond.rule.value, true, false)
-
-				case [2]string{"s", ">"}:
-					left = updateState(3, right, cond.rule.value, false, true)
-					right = updateState(3, right, cond.rule.value, false, false)
-				}
-
-				if !slices.ContainsFunc(left[:], func(si StateItem) bool { return si.isNotValid() }) {
-					queue = append(queue, Foo{cond.next, left})
-					current.state = right
-				} else {
-					fmt.Println("----")
-				}
-			} else {
-				queue = append(queue, Foo{cond.next, right})
+			st := current.state
+			if cond.rule == nil {
+				queue = append(queue, Foo{cond.next, st})
+				continue
 			}
+			var head, tail State
+			val := cond.rule.value
+			switch [2]string{cond.rule.element, cond.rule.condition} {
+			case [2]string{"x", "<"}:
+				head = updateState(st, st.upper.x, val, true, func() State {
+					return st.updateX(val-1, true)
+				})
+				tail = updateState(st, st.lower.x, val-1, false, func() State {
+					return st.updateX(val, false)
+				})
+
+			case [2]string{"x", ">"}:
+				head = updateState(st, st.lower.x, val, false, func() State {
+					return st.updateX(val+1, false)
+				})
+				tail = updateState(st, st.upper.x, val+1, true, func() State {
+					return st.updateX(val, true)
+				})
+
+			case [2]string{"m", "<"}:
+				head = updateState(st, st.upper.m, val, true, func() State {
+					return st.updateM(val-1, true)
+				})
+				tail = updateState(st, st.lower.m, val-1, false, func() State {
+					return st.updateM(val, false)
+				})
+
+			case [2]string{"m", ">"}:
+				head = updateState(st, st.lower.m, val, false, func() State {
+					return st.updateM(val+1, false)
+				})
+				tail = updateState(st, st.upper.m, val+1, true, func() State {
+					return st.updateM(val, true)
+				})
+
+			case [2]string{"a", "<"}:
+				head = updateState(st, st.upper.a, val, true, func() State {
+					return st.updateA(val-1, true)
+				})
+				tail = updateState(st, st.lower.a, val-1, false, func() State {
+					return st.updateA(val, false)
+				})
+
+			case [2]string{"a", ">"}:
+				head = updateState(st, st.lower.a, val, false, func() State {
+					return st.updateA(val+1, false)
+				})
+				tail = updateState(st, st.upper.a, val+1, true, func() State {
+					return st.updateA(val, true)
+				})
+
+			case [2]string{"s", "<"}:
+				head = updateState(st, st.upper.s, val, true, func() State {
+					return st.updateS(val-1, true)
+				})
+				tail = updateState(st, st.lower.s, val-1, false, func() State {
+					return st.updateS(val, false)
+				})
+
+			case [2]string{"s", ">"}:
+				head = updateState(st, st.lower.s, val, false, func() State {
+					return st.updateS(val+1, false)
+				})
+				tail = updateState(st, st.upper.s, val+1, true, func() State {
+					return st.updateS(val, true)
+				})
+			}
+			queue = append(queue, Foo{cond.next, head})
+			current.state = tail
 
 		}
 	}
-	for _, v := range agg {
-		fmt.Println(v)
-		var foo uint64 = 1
-		for _, s := range v {
-			foo *= uint64(s.diff())
-		}
-		fmt.Println(foo)
-		// fmt.Println()
-	}
-	fmt.Println(len(agg))
 
 	return sum
 }
 
-func updateState(i int, states [4]StateItem, value int, upperBound bool, notOpposite bool) [4]StateItem {
-	newStates := states
-	if upperBound {
-		if notOpposite {
-			if states[i].upper > value {
-				newStates[i] = StateItem{states[i].lower, value, states[i].upperStrict, true}
-			}
-		} else {
-			if states[i].lower <= value {
-				newStates[i] = StateItem{value, states[i].upper, false, states[i].upperStrict}
-			}
-		}
-	} else {
-		if notOpposite {
-			if states[i].lower < value {
-				newStates[i] = StateItem{value, states[i].upper, true, states[i].upperStrict}
-			}
-		} else {
-			if states[i].upper >= value {
-				newStates[i] = StateItem{states[i].lower, value, states[i].lowerStrict, false}
-			}
-		}
+func updateState(state State, current, value int, upper bool, update func() State) State {
+	if upper && current > value {
+		return update()
 	}
-	return newStates
+	if !upper && current < value {
+		return update()
+	}
+	return state
 }
