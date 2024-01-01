@@ -1,0 +1,22 @@
+[{1 4000 false false} {2090 4000 true false} {2006 4000 false false} {1 1351 false true}]
+[{1 1416 false true} {1 4000 false false} {1 2006 false true} {1 1351 false true}]
+[{1 2440 false false} {1 2090 false false} {2006 4000 false false} {537 1351 false true}]
+[{1 4000 false false} {1 4000 false false} {1 4000 false false} {3448 4000 true false}]
+[{1 4000 false false} {838 1801 true true} {1 4000 false false} {1351 2770 false false}]
+[{2662 4000 true false} {1 4000 false false} {1 2006 false true} {1 1351 false true}]
+[{1 4000 false false} {1548 4000 true false} {1 4000 false false} {2770 3448 true false}]
+[{1 4000 false false} {1 1548 false false} {1 4000 false false} {2770 3448 true false}]
+[{1 4000 false false} {1 838 false false} {1 1716 false false} {1351 2770 false false}]
+
+{{1 2090 2005 1} {4000 4000 4000 1351}}
+{{1 1 1 1} {1416 4000 2006 1351}}
+{{1 1 2005 536} {2441 2091 4000 1351}}
+{{1 1 1 3448} {4000 4000 4000 4000}}
+{{1 838 1 1350} {4000 1801 4000 2771}}
+{{2662 1 1 1} {4000 4000 2006 1351}}
+{{1 1548 1 2770} {4000 4000 4000 3449}}
+{{1 1 1 2770} {4000 1549 4000 3449}}
+{{1 1 1 1350} {4000 839 1717 2771}}
+
+138537764201069
+167409079868000

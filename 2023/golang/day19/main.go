@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -231,8 +230,8 @@ func traverse(workflows map[string]Workflow) uint64 {
 		}
 
 		w := workflows[current.name]
-		left, right := current.state, current.state
 		for _, cond := range w.conds {
+			left, right := current.state, current.state
 			if cond.rule != nil {
 				switch [2]string{cond.rule.element, cond.rule.condition} {
 				case [2]string{"x", "<"}:
@@ -268,11 +267,12 @@ func traverse(workflows map[string]Workflow) uint64 {
 					right = updateState(3, right, cond.rule.value, false, false)
 				}
 
-				if !slices.ContainsFunc(left[:], func(si StateItem) bool { return si.isNotValid() }) {
-					queue = append(queue, Foo{cond.next, left})
-				} else {
-					fmt.Println("----")
-				}
+				// if !slices.ContainsFunc(left[:], func(si StateItem) bool { return si.isNotValid() }) {
+				queue = append(queue, Foo{cond.next, left})
+				current.state = right
+				// } else {
+				// fmt.Println("----")
+				// }
 			} else {
 				queue = append(queue, Foo{cond.next, right})
 			}
