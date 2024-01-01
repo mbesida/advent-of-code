@@ -227,7 +227,7 @@ func (f State) updateS(value int, upper bool) State {
 	return new
 }
 
-type Foo struct {
+type QueueItem struct {
 	name  string
 	state State
 }
@@ -235,7 +235,7 @@ type Foo struct {
 func traverse(workflows map[string]Workflow) uint64 {
 	var sum uint64 = 0
 
-	queue := []Foo{{"in", NewState()}}
+	queue := []QueueItem{{"in", NewState()}}
 	for len(queue) != 0 {
 		current := queue[0]
 		queue = queue[1:]
@@ -251,7 +251,7 @@ func traverse(workflows map[string]Workflow) uint64 {
 		for _, cond := range w.conds {
 			st := current.state
 			if cond.rule == nil {
-				queue = append(queue, Foo{cond.next, st})
+				queue = append(queue, QueueItem{cond.next, st})
 				continue
 			}
 			var head, tail State
@@ -321,7 +321,7 @@ func traverse(workflows map[string]Workflow) uint64 {
 					return st.updateS(val, true)
 				})
 			}
-			queue = append(queue, Foo{cond.next, head})
+			queue = append(queue, QueueItem{cond.next, head})
 			current.state = tail
 
 		}
