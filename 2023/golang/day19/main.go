@@ -38,17 +38,24 @@ func NewState() StateItem {
 	return StateItem{1, 4000, false, false}
 }
 
-func (s StateItem) isNotValid() bool {
-	return s.lower > s.upper
-}
-func (s StateItem) diff() int {
+func (s StateItem) adjust() (int, int) {
+	a, b := s.lower, s.upper
 	if s.lowerStrict {
-		s.lower++
+		a++
 	}
 	if s.upperStrict {
-		s.upper--
+		b--
 	}
-	return s.upper - s.lower + 1
+	return a, b
+}
+
+func (s StateItem) isNotValid() bool {
+	res := s.diff()
+	return res <= 0
+}
+func (s StateItem) diff() int {
+	lower, upper := s.adjust()
+	return upper - lower + 1
 }
 
 func main() {
@@ -275,6 +282,7 @@ func traverse(workflows map[string]Workflow) uint64 {
 	for _, v := range agg {
 		fmt.Println(v)
 	}
+	fmt.Println(len(agg))
 
 	return sum
 }
