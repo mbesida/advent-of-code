@@ -14,7 +14,7 @@ type Item struct {
 	signal   bool
 }
 
-type StatefulModule interface {
+type Module interface {
 	Name() string
 	Update(signal bool, from string) int //-1 means do not send signal, 0 - low, 1 - high
 }
@@ -62,7 +62,7 @@ func (c *Conjunction) Update(signal bool, from string) int {
 }
 
 var configuration map[string][]string = make(map[string][]string)
-var state map[string]StatefulModule = make(map[string]StatefulModule)
+var state map[string]Module = make(map[string]Module)
 
 func process(from, to string, signal bool) int {
 	sm, ok := state[to]
