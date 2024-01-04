@@ -7,233 +7,143 @@ import (
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
-	"golang.org/x/exp/maps"
 )
 
-const WarmupCount = 1000
+type Item struct {
+	from, to string
+	signal   bool
+}
 
-var modules map[string]Module = make(map[string]Module)
-
-type Module interface {
+type StatefulModule interface {
 	Name() string
-	Destinations() []string
-	Receive(signal int, from string) Module
-	NextSignal() int //-1 means do not send signal, 0 - low, 1 - high
-	SetDestinations(dest []string)
-}
-
-func send(m Module) (int, int, []Module) {
-	low, high := 0, 0
-	signal := m.NextSignal()
-	var nextModules []Module
-	if signal != -1 {
-		if signal == 0 {
-			low += len(m.Destinations())
-		} else {
-			high += len(m.Destinations())
-		}
-		for _, d := range m.Destinations() {
-			dest, ok := modules[d]
-			if ok {
-				newModule := dest.Receive(signal, m.Name())
-				nextModules = append(nextModules, newModule)
-			}
-		}
-	}
-	return low, high, nextModules
-}
-
-type BroadCast struct {
-	name         string
-	destinations []string
-}
-
-func (b *BroadCast) Name() string                   { return b.name }
-func (b *BroadCast) Receive(_ int, _ string) Module { return nil }
-func (b *BroadCast) NextSignal() int                { return 0 }
-func (b *BroadCast) Destinations() []string         { return b.destinations }
-func (b *BroadCast) SetDestinations(dest []string) {
-	b.destinations = dest
+	Update(signal bool, from string) int //-1 means do not send signal, 0 - low, 1 - high
 }
 
 type FlipFlop struct {
-	name         string
-	isOn         bool
-	nextToSend   int
-	destinations []string
+	name string
+	isOn bool
 }
 
-func NewFlipFlop(name string) *FlipFlop {
-	return &FlipFlop{name, false, -1, nil}
-}
-
-func (b *FlipFlop) Name() string { return b.name }
-func (b *FlipFlop) Receive(signal int, _ string) Module {
-	m := NewFlipFlop(b.name)
-	m.destinations = b.destinations
-	m.isOn = b.isOn
-	m.nextToSend = b.nextToSend
-	m.name = b.name
-	if signal != 1 {
-		if b.isOn {
-			m.nextToSend = 0
-		} else {
-			m.nextToSend = 1
-		}
-		m.isOn = !b.isOn
-	} else {
-		m.nextToSend = -1
+func (f *FlipFlop) Name() string { return f.name }
+func (f *FlipFlop) Update(signal bool, _ string) int {
+	if signal {
+		return -1
 	}
-	return m
-}
-func (b *FlipFlop) NextSignal() int        { return b.nextToSend }
-func (b *FlipFlop) Destinations() []string { return b.destinations }
-func (b *FlipFlop) SetDestinations(dest []string) {
-	b.destinations = dest
+	var pulse int
+	if f.isOn {
+		pulse = 0
+	} else {
+		pulse = 1
+	}
+	f.isOn = !f.isOn
+	return pulse
 }
 
 type Conjunction struct {
-	name         string
-	inputs       map[string]int
-	destinations []string
+	name   string
+	inputs map[string]bool
 }
 
-func NewConjunction(name string) *Conjunction {
-	return &Conjunction{name, make(map[string]int), nil}
-}
-
-func (b *Conjunction) Name() string { return b.name }
-
-func (b *Conjunction) Receive(signal int, from string) Module {
-	m := NewConjunction(b.name)
-	m.name = b.name
-	m.inputs = b.inputs
-	m.destinations = b.destinations
-	if _, ok := b.inputs[from]; ok {
-		m.inputs[from] = signal
-	} else {
-		log.Fatalf("incorrect state: signal from unkown module %s", from)
+func (c *Conjunction) Name() string { return c.name }
+func (c *Conjunction) Update(signal bool, from string) int {
+	_, ok := c.inputs[from]
+	if !ok {
+		log.Fatalf("incorrect state: there is no %s in inputs map of conjunction %s", from, c.name)
 	}
-	return m
-}
-func (b *Conjunction) NextSignal() int {
-	for _, v := range b.inputs {
-		if v == 0 {
+	c.inputs[from] = signal
+
+	for _, receivedSignal := range c.inputs {
+		if !receivedSignal {
 			return 1
 		}
 	}
+
 	return 0
 }
-func (b *Conjunction) Destinations() []string { return b.destinations }
-func (b *Conjunction) SetDestinations(dest []string) {
-	b.destinations = dest
-}
-func (b *Conjunction) addInput(input string) {
-	b.inputs[input] = 0
-}
 
-type Test struct{ name string }
+var configuration map[string][]string = make(map[string][]string)
+var state map[string]StatefulModule = make(map[string]StatefulModule)
 
-func (b *Test) Name() string                   { return b.name }
-func (b *Test) Receive(_ int, _ string) Module { return nil }
-func (b *Test) NextSignal() int                { return -1 }
-func (b *Test) Destinations() []string         { return nil }
-func (b *Test) SetDestinations(dest []string)  {}
+func process(from, to string, signal bool) int {
+	sm, ok := state[to]
+	if ok {
+		return sm.Update(signal, from)
+	}
+	if to == "broadcaster" {
+		return 0
+	}
+	return -1
+}
 
 func main() {
 	f := common.InputFileHandle("day20")
 	defer f.Close()
 	bytes, _ := io.ReadAll(f)
-	parseInput(string(bytes))
-
-	res := warmup(modules)
+	readInitialState(string(bytes))
+	res := doWarmup()
 	fmt.Println(res)
 }
 
-func warmup(modules map[string]Module) uint64 {
-	broadcaster := modules["broadcaster"]
-	lowCounter, highCounter := 0, 0
-	for i := 0; i < WarmupCount; i++ {
-		lowCounter++
-		nextModules := []Module{broadcaster}
-		for nextModules != nil {
-			var newNextModules []Module
-			for _, m := range nextModules {
-				low, high, next := send(modules[m.Name()])
-				if low == 0 && high == 0 {
-					continue
-				}
-				newNextModules = append(newNextModules, next...)
-				lowCounter += low
-				highCounter += high
-			}
-			nextModules = newNextModules
-			for _, m := range nextModules {
-				modules[m.Name()] = m
+func doWarmup() uint64 {
+	var low, high int
+	warmupCount := 1000
+	for i := 0; i < warmupCount; i++ {
+		l, h := propagateSignals(0, 0, []Item{{"button", "broadcaster", false}})
+		low += l
+		high += h
+	}
+	fmt.Println(low, high)
+	return uint64(low) * uint64(high)
+}
+
+func propagateSignals(low, high int, items []Item) (int, int) {
+	if len(items) == 0 {
+		return low, high
+	}
+	var newItems []Item
+	for _, ni := range items {
+		if ni.signal {
+			high++
+		} else {
+			low++
+		}
+
+		nextSignal := process(ni.from, ni.to, ni.signal)
+		if nextSignal != -1 {
+			outputs := configuration[ni.to]
+			next := nextSignal != 0
+			for _, out := range outputs {
+				newItems = append(newItems, Item{ni.to, out, next})
 			}
 		}
 	}
-
-	fmt.Println(lowCounter, highCounter)
-	return uint64(lowCounter) * uint64(highCounter)
+	return propagateSignals(low, high, newItems)
 }
 
-func parseInput(s string) {
-	patterns := make(map[string][]string)
-	for _, line := range strings.Split(s, "\n") {
+func readInitialState(str string) {
+	for _, line := range strings.Split(str, "\n") {
 		data := strings.Split(line, " -> ")
 		input := data[0]
 		output := data[1]
-		patterns[input] = strings.Split(output, ", ")
-	}
-
-	for _, key := range maps.Keys(patterns) {
-		var name string
-		if key == "broadcaster" {
-			name = key
-			modules[key] = &BroadCast{key, nil}
-		}
-		name = key[1:]
-		if key[0] == '%' {
-			modules[name] = NewFlipFlop(name)
-			patterns[name] = patterns[key]
-		}
-		if key[0] == '&' {
-			modules[name] = NewConjunction(name)
-			patterns[name] = patterns[key]
+		outData := strings.Split(output, ", ")
+		if input[0] == '%' {
+			configuration[input[1:]] = outData
+			state[input[1:]] = &FlipFlop{input[1:], false}
+		} else if input[0] == '&' {
+			configuration[input[1:]] = outData
+			state[input[1:]] = &Conjunction{input[1:], make(map[string]bool)}
+		} else if input == "broadcaster" {
+			configuration[input] = outData
 		}
 	}
 
-	maps.DeleteFunc(patterns, func(key string, _ []string) bool {
-		return key[0] == '%' || key[0] == '&'
-	})
-
-	for key, outputs := range patterns {
-		setOutputs(key, modules, outputs)
-	}
-	for key, outputs := range patterns {
-		addInput(key, modules, outputs)
-	}
-}
-
-func setOutputs(key string, modules map[string]Module, outputs []string) {
-	var outModules []string
-	for _, out := range outputs {
-		m, ok := modules[out]
-		if ok {
-			outModules = append(outModules, m.Name())
-		} else {
-			outModules = append(outModules, out)
-		}
-	}
-	modules[key].SetDestinations(outModules)
-}
-
-func addInput(key string, modules map[string]Module, outputs []string) {
-	for _, out := range outputs {
-		conj, ok := modules[out].(*Conjunction)
-		if ok {
-			conj.addInput(key)
+	for k, outs := range configuration {
+		for _, out := range outs {
+			if sm, ok := state[out]; ok {
+				if c, ok := sm.(*Conjunction); ok {
+					c.inputs[k] = false
+				}
+			}
 		}
 	}
 }
