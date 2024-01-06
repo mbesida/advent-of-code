@@ -21,11 +21,12 @@ func main() {
 
 	bytes, _ := io.ReadAll(f)
 	start := parseGarden(string(bytes))
+	distances := calculateDistances(start)
 	t1 := func() uint64 {
-		return countReachability(64, map[common.Point]struct{}{start: struct{}{}}, 0)
+		return task1(distances, 64)
 	}
 	t2 := func() uint64 {
-		return task2(start)
+		return task2(distances)
 	}
 	fmt.Println(common.HandleTasks(t1, t2))
 
@@ -70,42 +71,6 @@ func parseGarden(data string) common.Point {
 	return start
 }
 
-func countReachability(target int, starts map[common.Point]struct{}, steps int) uint64 {
-	k := uint64(len(starts))
-	if steps == target {
-		// printGarden(maps.Keys(starts))
-		return k
-	}
-	nextStarts := make(map[common.Point]struct{})
-	for p := range starts {
-		i, j := cycle(p.I, n), cycle(p.J, m)
-		if garden[i][cycle(j+1, m)] == 0 {
-			nextStarts[common.Point{p.I, p.J + 1}] = struct{}{}
-		}
-		if garden[i][cycle(j-1, m)] == 0 {
-			nextStarts[common.Point{p.I, p.J - 1}] = struct{}{}
-		}
-		if garden[cycle(i+1, n)][j] == 0 {
-			nextStarts[common.Point{p.I + 1, p.J}] = struct{}{}
-		}
-		if garden[cycle(i-1, n)][j] == 0 {
-			nextStarts[common.Point{p.I - 1, p.J}] = struct{}{}
-		}
-	}
-	return countReachability(target, nextStarts, steps+1)
-}
-
-func cycle(index int, size int) int {
-	mod := index % size
-	if mod == 0 {
-		return 0
-	}
-	if index < 0 {
-		return size + mod
-	}
-	return mod
-}
-
 func calculateDistances(start common.Point) map[common.Point]int {
 	distances := make(map[common.Point]int)
 	pq := kpq.NewKeyedPriorityQueue[common.Point, int](func(a, b int) bool {
@@ -131,9 +96,20 @@ func calculateDistances(start common.Point) map[common.Point]int {
 	return distances
 }
 
-func task2(start common.Point) uint64 {
-	distances := calculateDistances(start)
+func task1(distances map[common.Point]int, targetSteps int) uint64 {
+	k := 0
+	for i := targetSteps; i >= 0; i -= 2 {
+		for _, v := range distances {
+			if v == i {
+				k++
+			}
+		}
+	}
+	return uint64(k)
+}
 
+// inspired by https://github.com/villuna/aoc23/wiki/A-Geometric-solution-to-advent-of-code-2023,-day-21
+func task2(distances map[common.Point]int) uint64 {
 	var targetSteps uint64 = 26501365
 	// n = 131
 	// 26501365 % n = 65
