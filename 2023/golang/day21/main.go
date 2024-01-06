@@ -71,6 +71,7 @@ func parseGarden(data string) common.Point {
 	return start
 }
 
+// based on dijkstra algorithm
 func calculateDistances(start common.Point) map[common.Point]int {
 	distances := make(map[common.Point]int)
 	pq := kpq.NewKeyedPriorityQueue[common.Point, int](func(a, b int) bool {
@@ -109,6 +110,8 @@ func task1(distances map[common.Point]int, targetSteps int) uint64 {
 }
 
 // inspired by https://github.com/villuna/aoc23/wiki/A-Geometric-solution-to-advent-of-code-2023,-day-21
+// can't be applied in general case
+// e.g doesn't work for test input
 func task2(distances map[common.Point]int) uint64 {
 	var targetSteps uint64 = 26501365
 	// n = 131
