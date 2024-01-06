@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"slices"
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
+	"golang.org/x/exp/maps"
 )
 
 type Item struct {
 	from, to string
 	signal   bool
 }
+type State []Item
 
 type Module interface {
 	Name() string
@@ -44,6 +47,14 @@ type Conjunction struct {
 	inputs map[string]bool
 }
 
+func (c *Conjunction) NextSignal() int {
+	for _, receivedSignal := range c.inputs {
+		if !receivedSignal {
+			return 1
+		}
+	}
+	return 0
+}
 func (c *Conjunction) Name() string { return c.name }
 func (c *Conjunction) Update(signal bool, from string) int {
 	_, ok := c.inputs[from]
@@ -52,13 +63,7 @@ func (c *Conjunction) Update(signal bool, from string) int {
 	}
 	c.inputs[from] = signal
 
-	for _, receivedSignal := range c.inputs {
-		if !receivedSignal {
-			return 1
-		}
-	}
-
-	return 0
+	return c.NextSignal()
 }
 
 var configuration map[string][]string = make(map[string][]string)
@@ -80,15 +85,20 @@ func main() {
 	defer f.Close()
 	bytes, _ := io.ReadAll(f)
 	readInitialState(string(bytes))
-	res := doWarmup()
-	fmt.Println(res)
+	t1 := func() uint64 {
+		return doWarmup()
+	}
+	t2 := func() uint64 {
+		return countMinPresses()
+	}
+	fmt.Println(common.HandleTasks(t1, t2))
 }
 
 func doWarmup() uint64 {
 	var low, high int
 	warmupCount := 1000
 	for i := 0; i < warmupCount; i++ {
-		l, h := propagateSignals(0, 0, []Item{{"button", "broadcaster", false}})
+		l, h := propagateSignals(0, 0, []Item{{"button", "broadcaster", false}}, func(_ Item) {})
 		low += l
 		high += h
 	}
@@ -96,12 +106,51 @@ func doWarmup() uint64 {
 	return uint64(low) * uint64(high)
 }
 
-func propagateSignals(low, high int, items []Item) (int, int) {
-	if len(items) == 0 {
+// "lk" "zv" "sp" "xt" - are closest modules to "dg" module which is the only connection to "rx"(our target module)
+// probably this problem doesn't have general solution(maybe not works on other input data)
+//
+// here, idea is that high signal reaches on of these modules with some periodicity
+// so we can count on which iteration each module receives high signal and find
+// least common multiple of those numbers
+// (meaning that on that iteration all these module receive high signal simulteneously)
+// This is similar to what we had on day08
+func countMinPresses() uint64 {
+	counters := map[string]uint64{
+		"lk": 0,
+		"zv": 0,
+		"sp": 0,
+		"xt": 0,
+	}
+
+	k := 1
+	for {
+		fn := func(item Item) {
+			if slices.Contains(maps.Keys(counters), item.from) && item.signal {
+				if counters[item.from] == 0 {
+					counters[item.from] = uint64(k)
+				}
+			}
+		}
+		propagateSignals(0, 0, []Item{{"button", "broadcaster", false}}, fn)
+
+		if !slices.ContainsFunc(maps.Values(counters), func(i uint64) bool { return i == 0 }) {
+			break
+		}
+
+		k++
+	}
+
+	return lcm(maps.Values(counters))
+}
+
+func propagateSignals(low, high int, state State, fn func(i Item)) (int, int) {
+
+	if len(state) == 0 {
 		return low, high
 	}
-	var newItems []Item
-	for _, ni := range items {
+
+	var newState State
+	for _, ni := range state {
 		if ni.signal {
 			high++
 		} else {
@@ -110,14 +159,17 @@ func propagateSignals(low, high int, items []Item) (int, int) {
 
 		nextSignal := process(ni.from, ni.to, ni.signal)
 		if nextSignal != -1 {
+			fn(ni) //process for part 2, do nothing for part 1
 			outputs := configuration[ni.to]
 			next := nextSignal != 0
 			for _, out := range outputs {
-				newItems = append(newItems, Item{ni.to, out, next})
+				newState = append(newState, Item{ni.to, out, next})
 			}
 		}
+
 	}
-	return propagateSignals(low, high, newItems)
+
+	return propagateSignals(low, high, newState, fn)
 }
 
 func readInitialState(str string) {
@@ -146,4 +198,22 @@ func readInitialState(str string) {
 			}
 		}
 	}
+}
+
+func lcm(nums []uint64) uint64 {
+	if len(nums) == 1 {
+		return nums[0]
+	}
+	a := nums[0]
+	b := lcm(nums[1:])
+	return (a * b) / gcd(a, b)
+}
+
+func gcd(a, b uint64) uint64 {
+	for b != 0 {
+		t := b
+		b = a % b
+		a = t
+	}
+	return a
 }
