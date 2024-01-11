@@ -11,13 +11,6 @@ import (
 	"github.com/mbesida/advent-of-code-2023/common"
 )
 
-type Orientation int
-
-const (
-	Horizontal Orientation = iota
-	Vertical
-)
-
 type Coords struct {
 	x, y, z int
 }
@@ -44,15 +37,16 @@ func main() {
 	fmt.Println(res)
 }
 
-func process(bricks []Brick) int {
-	slices.SortFunc(bricks, func(b1, b2 Brick) int {
-		if b1.start.z < b2.start.z {
-			return -1
-		}
-		return 1
-	})
+func sortFunc(a, b Brick) int {
+	if a.start.z < b.start.z {
+		return -1
+	}
+	return 1
+}
 
+func process(bricks []Brick) int {
 	fallen := fall(bricks)
+	slices.SortFunc(fallen, sortFunc)
 	startMap := make(map[int][]Brick)
 	endMap := make(map[int][]Brick)
 	for _, b := range fallen {
@@ -94,6 +88,8 @@ func process(bricks []Brick) int {
 }
 
 func fall(bricks []Brick) []Brick {
+	slices.SortFunc(bricks, sortFunc) // sort by start.z
+
 	var mX, mY, mZ int
 	for _, b := range bricks {
 		mX = max(mX, b.end.x)
@@ -127,36 +123,17 @@ func fall(bricks []Brick) []Brick {
 		} else {
 			b := bricks[i]
 			currentZ := b.start.z
-			for {
-				var flag bool
-			loop:
-				for i := b.start.x; i <= b.end.x; i++ {
-					for j := b.start.y; j <= b.end.y; j++ {
-						if grid[i][j][currentZ] == 1 {
-							flag = true
-							break loop
-						}
-					}
-				}
-				if !flag {
-					currentZ--
-					continue
-				}
-
-				currentZ++
-				diff := b.start.z - currentZ
-				var endZ int
-				if orientation(b) == Vertical {
-					endZ = b.end.z - diff
-				} else {
-					endZ = currentZ
-				}
-				fallen[i] = Brick{Coords{b.start.x, b.start.y, currentZ}, Coords{b.end.x, b.end.y, endZ}}
-				break
+			for !checkOccupation(grid, b, currentZ) {
+				currentZ--
 			}
+			currentZ++
+			diff := b.start.z - currentZ
+			endZ := b.end.z - diff
+			fallen[i] = Brick{Coords{b.start.x, b.start.y, currentZ}, Coords{b.end.x, b.end.y, endZ}}
 		}
 		occupy(grid, fallen[i])
 	}
+
 	return fallen
 }
 
@@ -168,6 +145,17 @@ func occupy(grid [][][]int, b Brick) {
 			}
 		}
 	}
+}
+
+func checkOccupation(grid [][][]int, b Brick, currentZ int) bool {
+	for i := b.start.x; i <= b.end.x; i++ {
+		for j := b.start.y; j <= b.end.y; j++ {
+			if grid[i][j][currentZ] == 1 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func parseData(reader io.Reader) []Brick {
@@ -185,9 +173,9 @@ func parseBrick(line string) Brick {
 	data := strings.Split(line, "~")
 	start := parseCoords(data[0])
 	end := parseCoords(data[1])
-	// if start.x > end.x || (start.x == end.x && start.y > end.y) {
-	// 	start, end = end, start
-	// }
+	if start.x > end.x || (start.x == end.x && start.y > end.y) {
+		start, end = end, start
+	}
 	return Brick{start, end}
 }
 
@@ -197,13 +185,6 @@ func parseCoords(s string) Coords {
 	y, _ := strconv.Atoi(data[1])
 	z, _ := strconv.Atoi(data[2])
 	return Coords{x, y, z}
-}
-
-func orientation(b Brick) Orientation {
-	if b.start.z < b.end.z {
-		return Vertical
-	}
-	return Horizontal
 }
 
 func printBricks(bricks []Brick) {
