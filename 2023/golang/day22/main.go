@@ -114,23 +114,17 @@ func fall(bricks []Brick) []Brick {
 	}
 
 	fallen := make([]Brick, len(bricks))
-	fallen[0] = bricks[0]
-	occupy(grid, bricks[0])
 
-	for i := 1; i < len(bricks); i++ {
-		if fallen[i-1].start.z == bricks[i].start.z {
-			fallen[i] = bricks[i]
-		} else {
-			b := bricks[i]
-			currentZ := b.start.z
-			for !checkOccupation(grid, b, currentZ) {
-				currentZ--
-			}
-			currentZ++
-			diff := b.start.z - currentZ
-			endZ := b.end.z - diff
-			fallen[i] = Brick{Coords{b.start.x, b.start.y, currentZ}, Coords{b.end.x, b.end.y, endZ}}
+	for i := 0; i < len(bricks); i++ {
+		b := bricks[i]
+		currentZ := b.start.z
+		for !checkOccupation(grid, b, currentZ) {
+			currentZ--
 		}
+		currentZ++
+		diff := b.start.z - currentZ
+		endZ := b.end.z - diff
+		fallen[i] = Brick{Coords{b.start.x, b.start.y, currentZ}, Coords{b.end.x, b.end.y, endZ}}
 		occupy(grid, fallen[i])
 	}
 
@@ -185,10 +179,4 @@ func parseCoords(s string) Coords {
 	y, _ := strconv.Atoi(data[1])
 	z, _ := strconv.Atoi(data[2])
 	return Coords{x, y, z}
-}
-
-func printBricks(bricks []Brick) {
-	for _, b := range bricks {
-		fmt.Println(b)
-	}
 }
