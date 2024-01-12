@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mbesida/advent-of-code-2023/common"
+	"golang.org/x/exp/maps"
 )
 
 type Coords struct {
@@ -27,6 +28,32 @@ func (b Brick) holds(other Brick) bool {
 	return false
 }
 
+func (b Brick) supports(nextLevel []Brick) []Brick {
+	var supportedByB []Brick
+	for _, nb := range nextLevel {
+		if b.holds(nb) {
+			supportedByB = append(supportedByB, nb)
+		}
+	}
+	return supportedByB
+}
+
+func (b Brick) supportsExclusive(currentLevel, nextLevel []Brick) []Brick {
+	var allSupportedByB []Brick
+	for _, nb := range nextLevel {
+		if b.holds(nb) {
+			allSupportedByB = append(allSupportedByB, nb)
+		}
+	}
+	supportedOnlyByB := allSupportedByB
+	for _, other := range currentLevel {
+		if b != other {
+			supportedOnlyByB = slices.DeleteFunc(supportedOnlyByB, func(a Brick) bool { return other.holds(a) })
+		}
+	}
+	return supportedOnlyByB
+}
+
 func main() {
 	f := common.InputFileHandle("day22")
 	defer f.Close()
@@ -37,8 +64,14 @@ func main() {
 	fmt.Println(res)
 }
 
-func sortFunc(a, b Brick) int {
+func sortByStart(a, b Brick) int {
 	if a.start.z < b.start.z {
+		return -1
+	}
+	return 1
+}
+func sortByEnd(a, b Brick) int {
+	if a.end.z < b.end.z {
 		return -1
 	}
 	return 1
@@ -46,49 +79,87 @@ func sortFunc(a, b Brick) int {
 
 func process(bricks []Brick) int {
 	fallen := fall(bricks)
-	slices.SortFunc(fallen, sortFunc)
+	slices.SortFunc(fallen, sortByStart)
 	startMap := make(map[int][]Brick)
 	endMap := make(map[int][]Brick)
 	for _, b := range fallen {
 		startMap[b.start.z] = append(startMap[b.start.z], b)
 		endMap[b.end.z] = append(endMap[b.end.z], b)
 	}
+	t1 := func() int {
+		return task1(fallen, startMap, endMap)
+	}
+	t2 := func() int {
+		return task2(fallen, startMap, endMap)
+	}
 
-	var safeToRemove []Brick
-	for _, b := range fallen {
+	return common.HandleTasks(t1, t2)
+}
+
+func task1(bricks []Brick, startMap, endMap map[int][]Brick) int {
+	countRemovable := 0
+	for _, b := range bricks {
 		currentLevel := endMap[b.end.z]
 		nextLevel := startMap[b.end.z+1]
-		var holdedByB []Brick
-		for _, nb := range nextLevel {
-			if b.holds(nb) {
-				holdedByB = append(holdedByB, nb)
-			}
-		}
-		if len(holdedByB) == 0 {
-			safeToRemove = append(safeToRemove, b)
-			continue
-		}
-		holdedByOthers := make(map[Brick]int)
-		for _, currentLevelB := range currentLevel {
-			if currentLevelB != b {
-				for _, hb := range holdedByB {
-					if currentLevelB.holds(hb) {
-						holdedByOthers[hb]++
-					}
-				}
-			}
-		}
 
-		if len(holdedByB) == len(holdedByOthers) {
-			safeToRemove = append(safeToRemove, b)
+		if len(b.supportsExclusive(currentLevel, nextLevel)) == 0 {
+			countRemovable++
 		}
 	}
 
-	return len(safeToRemove)
+	return countRemovable
+}
+
+// slow, but does a job
+func task2(bricks []Brick, startMap, endMap map[int][]Brick) int {
+	supportsOnly := make(map[Brick][]Brick)
+	for _, b := range bricks {
+		currentLevel := endMap[b.end.z]
+		nextLevel := startMap[b.end.z+1]
+		supprtedOnly := b.supportsExclusive(currentLevel, nextLevel)
+		if len(supprtedOnly) != 0 {
+			supportsOnly[b] = supprtedOnly
+		}
+	}
+	counter := 0
+	for supporter, suportees := range supportsOnly {
+		currentBricks := make(map[Brick]struct{})
+		currentBricks[supporter] = struct{}{}
+		currentSupportees := suportees
+		for _, sp := range suportees {
+			currentBricks[sp] = struct{}{}
+		}
+
+		for {
+			var newCurrentSupportees []Brick
+			for _, sp := range currentSupportees {
+				prevLevel := endMap[sp.start.z-1]
+				nextLevel := startMap[sp.end.z+1]
+				var skip bool
+				for _, plb := range prevLevel {
+					if plb.holds(sp) && !slices.Contains(maps.Keys(currentBricks), plb) {
+						skip = true
+						break
+					}
+				}
+				if skip {
+					continue
+				}
+				currentBricks[sp] = struct{}{}
+				newCurrentSupportees = append(newCurrentSupportees, sp.supports(nextLevel)...)
+			}
+			if len(newCurrentSupportees) == 0 {
+				break
+			}
+			currentSupportees = newCurrentSupportees
+		}
+		counter += len(currentBricks) - 1
+	}
+	return counter
 }
 
 func fall(bricks []Brick) []Brick {
-	slices.SortFunc(bricks, sortFunc) // sort by start.z
+	slices.SortFunc(bricks, sortByStart) // sort by start.z
 
 	var mX, mY, mZ int
 	for _, b := range bricks {
