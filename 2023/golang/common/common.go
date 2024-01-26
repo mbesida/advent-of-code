@@ -30,6 +30,16 @@ func HandleTasks[T any](task1Func func() T, task2Func func() T) T {
 	}
 }
 
+func ExecuteActions(action1, action2 func()) {
+	choice := getChoice()
+
+	if choice == "2" {
+		action2()
+	} else {
+		action1()
+	}
+}
+
 func HandleValue[T any](value1 T, value2 T) T {
 	choice := getChoice()
 
